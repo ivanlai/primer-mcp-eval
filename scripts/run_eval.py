@@ -40,6 +40,7 @@ ARMS = ("baseline", "primer")
 BATCHES = ("pilot", "headline")
 PROJECT_NAME = "expenses"
 TOKEN_FILE = Path.home() / ".config" / "primer-mcp-eval" / "oauth-token"
+CLAUDE_VERSIONS = Path.home() / ".local" / "share" / "claude" / "versions"
 
 
 def load_config() -> dict:
@@ -137,6 +138,7 @@ def run_env(home: Path) -> dict:
     env["XDG_CONFIG_HOME"] = str(home / ".config")
     env["UV_CACHE_DIR"] = os.environ.get("UV_CACHE_DIR", str(Path.home() / ".cache" / "uv"))
     env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["DISABLE_AUTOUPDATER"] = "1"
     return env
 
 
@@ -268,9 +270,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = load_config()
-    claude = str(Path(args.claude).resolve()) if args.claude else shutil.which("claude")
-    if not claude:
-        sys.exit("claude not found on PATH")
+    # The pinned version's own binary, so an auto-update of `claude` can't change a batch.
+    pinned = CLAUDE_VERSIONS / cfg["pins"]["claude_cli"]
+    claude = str(Path(args.claude).resolve()) if args.claude else str(pinned)
+    if not args.claude and not pinned.is_file():
+        sys.exit(f"pinned claude {pinned} is not installed")
     if not args.claude:
         check_cli_version(claude, cfg["pins"]["claude_cli"])
         if not args.dry_run and not credentials():
