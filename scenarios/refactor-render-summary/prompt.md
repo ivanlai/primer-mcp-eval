@@ -1,0 +1,1 @@
+The `summary` command in `cli.py` both works out the monthly summary and builds its text. Move the text-building into a function `render_summary(summary) -> str` in `reports.py`, so the command just prints what `render_summary` returns. The output must stay exactly the same.

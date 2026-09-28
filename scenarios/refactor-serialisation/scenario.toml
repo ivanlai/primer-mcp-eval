@@ -1,0 +1,2 @@
+kind = "refactor"
+expected_files = ["src/expenses/models.py", "src/expenses/storage.py"]

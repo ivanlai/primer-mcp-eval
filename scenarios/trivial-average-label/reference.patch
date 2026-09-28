@@ -1,0 +1,26 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..a097936 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -95,7 +95,7 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+         print("No expenses this month.")
+         return 0
+     print(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
+-    print(f"Daily average:  {format_amount(summary.daily_average_pence)}")
++    print(f"Average per day: {format_amount(summary.daily_average_pence)}")
+     print("By category:")
+     for item in summary.by_category:
+         print(
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 50283eb..8850130 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -58,7 +58,7 @@ def test_summary(run):
+     code, out, _ = run("summary", "2026-03")
+     assert code == 0
+     assert "Total:          40.00 (2 expenses)" in out
+-    assert "Daily average:  1.29" in out
++    assert "Average per day: 1.29" in out
+     assert "food" in out and "75%" in out
+ 
+ 

@@ -1,0 +1,2 @@
+kind = "trivial"
+expected_files = ["src/expenses/cli.py"]

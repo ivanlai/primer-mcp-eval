@@ -1,0 +1,68 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..fd86980 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -16,7 +16,7 @@ from expenses.models import (
+     parse_date,
+     parse_month,
+ )
+-from expenses.reports import in_category, in_month, month_summary
++from expenses.reports import in_category, in_month, month_summary, render_summary
+ from expenses.storage import ExpenseStore, StorageError, default_path
+ 
+ 
+@@ -89,19 +89,7 @@ def cmd_categories(store: ExpenseStore, args: argparse.Namespace) -> int:
+ 
+ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+     year, month = parse_month(args.month)
+-    summary = month_summary(store.all(), year, month)
+-    print(f"Summary for {year:04d}-{month:02d}")
+-    if not summary.count:
+-        print("No expenses this month.")
+-        return 0
+-    print(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
+-    print(f"Daily average:  {format_amount(summary.daily_average_pence)}")
+-    print("By category:")
+-    for item in summary.by_category:
+-        print(
+-            f"  {item.category:<16} {format_amount(item.total_pence):>10}"
+-            f"  {item.share_percent:>3}%  ({item.count})"
+-        )
++    print(render_summary(month_summary(store.all(), year, month)), end="")
+     return 0
+ 
+ 
+diff --git a/src/expenses/reports.py b/src/expenses/reports.py
+index 1c1ff0f..85ed95f 100644
+--- a/src/expenses/reports.py
++++ b/src/expenses/reports.py
+@@ -6,7 +6,7 @@ import calendar
+ from collections import defaultdict
+ from dataclasses import dataclass
+ 
+-from expenses.models import Expense
++from expenses.models import Expense, format_amount
+ 
+ 
+ def in_month(expenses: list[Expense], year: int, month: int) -> list[Expense]:
+@@ -64,3 +64,20 @@ def month_summary(expenses: list[Expense], year: int, month: int) -> MonthSummar
+         daily_average_pence=round(total / days),
+         by_category=by_category,
+     )
++
++
++def render_summary(summary: MonthSummary) -> str:
++    """The text of the summary command for one month."""
++    lines = [f"Summary for {summary.year:04d}-{summary.month:02d}"]
++    if not summary.count:
++        lines.append("No expenses this month.")
++        return "\n".join(lines) + "\n"
++    lines.append(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
++    lines.append(f"Daily average:  {format_amount(summary.daily_average_pence)}")
++    lines.append("By category:")
++    for item in summary.by_category:
++        lines.append(
++            f"  {item.category:<16} {format_amount(item.total_pence):>10}"
++            f"  {item.share_percent:>3}%  ({item.count})"
++        )
++    return "\n".join(lines) + "\n"
