@@ -13,7 +13,6 @@ EXPENSES = [
     make(2, date(2026, 3, 1), 3000, "food"),
     make(3, date(2026, 3, 15), 1000, "travel"),
     make(4, date(2026, 3, 31), 2000, "food"),
-    make(5, date(2025, 3, 10), 9900, "food"),
 ]
 
 

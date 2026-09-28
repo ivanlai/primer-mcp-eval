@@ -63,7 +63,7 @@ def cmd_list(store: ExpenseStore, args: argparse.Namespace) -> int:
         year, month = parse_month(args.month)
         expenses = in_month(expenses, year, month)
     if args.category:
-        expenses = in_category(expenses, normalise_category(args.category))
+        expenses = in_category(expenses, args.category)
     if not expenses:
         print("No expenses found.")
         return 0
