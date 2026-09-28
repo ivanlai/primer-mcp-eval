@@ -1,14 +1,14 @@
-"""Validate the eval tasks in tasks/ against a fresh copy of the fixture.
+"""Validate the eval scenarios in scenarios/ against a fresh copy of the fixture.
 
-For each task: its files are present and well formed, the prompt avoids words that
+For each scenario: its files are present and well formed, the prompt avoids words that
 would hint at the workflow being measured, the check fails on the fixture as shipped,
 and with reference.patch applied the check and the fixture's own suite pass and the
-patch stays within expected_files (tests/ is always allowed). See tasks/README.md.
+patch stays within expected_files (tests/ is always allowed). See scenarios/README.md.
 
 The fixture is exported from git HEAD, as the runner will do, so commit fixture
 changes before validating against them.
 
-Usage: python3 scripts/validate_tasks.py [task-id ...]
+Usage: python3 scripts/validate_scenarios.py [scenario-id ...]
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TASKS = ROOT / "tasks"
+SCENARIOS = ROOT / "scenarios"
 FIXTURE = "fixtures/app"
 KINDS = {"feature", "bug", "refactor", "trivial", "ambiguous"}
 BANNED = re.compile(
@@ -36,10 +36,10 @@ PYTEST = ["uv", "run", "--quiet", "pytest", "-q", "-p", "no:cacheprovider"]
 ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 
-def task_dirs(ids: list[str]) -> list[Path]:
+def scenario_dirs(ids: list[str]) -> list[Path]:
     if ids:
-        return [TASKS / i for i in ids]
-    return sorted(p.parent for p in TASKS.glob("*/task.toml"))
+        return [SCENARIOS / i for i in ids]
+    return sorted(p.parent for p in SCENARIOS.glob("*/scenario.toml"))
 
 
 def fresh_fixture(dest: Path) -> None:
@@ -68,13 +68,13 @@ def patched_files(patch: str) -> set[str]:
     return set(re.findall(r"^diff --git a/\S+ b/(\S+)$", patch, re.MULTILINE))
 
 
-def validate(task: Path) -> list[str]:
-    """Return the problems found with one task; empty means valid."""
-    if not (task / "task.toml").is_file():
-        return ["no task.toml"]
+def validate(scenario: Path) -> list[str]:
+    """Return the problems found with one scenario; empty means valid."""
+    if not (scenario / "scenario.toml").is_file():
+        return ["no scenario.toml"]
     problems = []
 
-    meta = tomllib.loads((task / "task.toml").read_text())
+    meta = tomllib.loads((scenario / "scenario.toml").read_text())
     if meta.get("kind") not in KINDS:
         problems.append(f"kind must be one of {sorted(KINDS)}")
     expected = meta.get("expected_files")
@@ -82,15 +82,15 @@ def validate(task: Path) -> list[str]:
         problems.append("expected_files must be a non-empty list")
         expected = []
 
-    prompt_file = task / "prompt.md"
+    prompt_file = scenario / "prompt.md"
     prompt = prompt_file.read_text().strip() if prompt_file.is_file() else ""
     if not prompt:
         problems.append("prompt.md missing or empty")
     for word in sorted({m.group(0).lower() for m in BANNED.finditer(prompt)}):
         problems.append(f"prompt mentions {word!r}")
 
-    checks = list(task.glob("test_*.py"))
-    patch_file = task / "reference.patch"
+    checks = list(scenario.glob("test_*.py"))
+    patch_file = scenario / "reference.patch"
     if len(checks) != 1 or not patch_file.is_file():
         if len(checks) != 1:
             problems.append(f"expected one test_*.py check, found {len(checks)}")
@@ -107,7 +107,7 @@ def validate(task: Path) -> list[str]:
     if outside:
         problems.append(f"reference changes files outside expected_files: {outside}")
 
-    check = ["--confcutdir", str(TASKS), str(checks[0])]
+    check = ["--confcutdir", str(SCENARIOS), str(checks[0])]
     with tempfile.TemporaryDirectory() as tmp:
         copy = Path(tmp)
         fresh_fixture(copy)
@@ -132,18 +132,19 @@ def validate(task: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    if not (TASKS / "autonomy.txt").is_file() or not (TASKS / "autonomy.txt").read_text().strip():
-        print("tasks/autonomy.txt missing or empty")
+    autonomy = SCENARIOS / "autonomy.txt"
+    if not autonomy.is_file() or not autonomy.read_text().strip():
+        print("scenarios/autonomy.txt missing or empty")
         return 1
-    tasks = task_dirs(argv)
+    scenarios = scenario_dirs(argv)
     failed = 0
-    for task in tasks:
-        problems = validate(task)
-        print(f"{'FAIL' if problems else 'ok  '}  {task.name}")
+    for scenario in scenarios:
+        problems = validate(scenario)
+        print(f"{'FAIL' if problems else 'ok  '}  {scenario.name}")
         for problem in problems:
             print(f"        {problem}")
         failed += bool(problems)
-    print(f"\n{len(tasks) - failed}/{len(tasks)} tasks valid")
+    print(f"\n{len(scenarios) - failed}/{len(scenarios)} scenarios valid")
     return 1 if failed else 0
 
 
