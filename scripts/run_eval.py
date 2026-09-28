@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cfg = load_config()
-    claude = args.claude or shutil.which("claude")
+    claude = str(Path(args.claude).resolve()) if args.claude else shutil.which("claude")
     if not claude:
         sys.exit("claude not found on PATH")
     if not args.claude:

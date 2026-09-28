@@ -92,3 +92,13 @@ def test_dry_run_writes_nothing(tmp_path, capsys):
 def test_mcp_config_per_arm(arm):
     servers = run_eval.mcp_config(arm, "0.1.7", "uvx")["mcpServers"]
     assert (arm == "primer") == ("primer-mcp" in servers)
+
+
+def test_relative_claude_path_works(tmp_path, monkeypatch):
+    monkeypatch.chdir(Path(STUB).parent.parent)
+    rel = str(Path(STUB).relative_to(Path.cwd()))
+    code = run_eval.main(
+        ["--batch", "pilot", "--scenario", SCENARIO, "--arm", "baseline"]
+        + ["--claude", rel, "--runs-dir", str(tmp_path)]
+    )
+    assert code == 0
