@@ -180,6 +180,11 @@ def check_isolation(arm: str, transcript: Path, user_home: Path | None = None) -
     memory = [m for m in (event.get("memory_paths") or {}).values() if "eval-home-" not in m]
     if memory:
         problems.append(f"memory outside the run's HOME: {memory}")
+    cwd = Path(event.get("cwd", "/"))
+    if cwd == ROOT or ROOT in cwd.parents:
+        problems.append(f"session ran inside the eval repo: {cwd}")
+    if str(ROOT) in transcript.read_text():
+        problems.append("the session referenced the eval repo's path")
     servers = {s.get("name") for s in event.get("mcp_servers", [])}
     mcp_tools = [t for t in event.get("tools", []) if t.startswith("mcp__")]
     if arm == "baseline":
@@ -195,7 +200,12 @@ def check_isolation(arm: str, transcript: Path, user_home: Path | None = None) -
 
 def run_one(run_dir: Path, scenario: str, arm: str, cfg: dict, claude: str, dry_run: bool) -> dict:
     prompt = compose_prompt(scenario)
-    with tempfile.TemporaryDirectory(prefix="eval-home-") as tmp:
+    # HOME and the working repo both live outside the eval repo: Claude Code reads CLAUDE.md
+    # from parent directories, and an agent searching upwards must not find scenarios/.
+    with (
+        tempfile.TemporaryDirectory(prefix="eval-home-") as tmp,
+        tempfile.TemporaryDirectory(prefix="eval-work-") as work_tmp,
+    ):
         home = Path(tmp)
         mcp_file = home / "mcp.json"
         uvx = shutil.which("uvx") or "uvx"
@@ -214,7 +224,7 @@ def run_one(run_dir: Path, scenario: str, arm: str, cfg: dict, claude: str, dry_
             return {"dry_run": True}
 
         run_dir.mkdir(parents=True, exist_ok=True)
-        repo = run_dir / "repo"
+        repo = Path(work_tmp) / "repo"
         prepare_repo(repo, arm, cfg["pins"]["primer_mcp"])
         (run_dir / "prompt.txt").write_text(prompt)
         (run_dir / "command.json").write_text(
@@ -247,6 +257,9 @@ def run_one(run_dir: Path, scenario: str, arm: str, cfg: dict, claude: str, dry_
             "duration_s": round(time.monotonic() - start, 1),
             "isolation_problems": check_isolation(arm, transcript),
         }
+        shutil.copytree(
+            repo, run_dir / "repo", symlinks=True, ignore=shutil.ignore_patterns(".venv")
+        )
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     return meta
 

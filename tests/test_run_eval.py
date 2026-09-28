@@ -164,3 +164,33 @@ def test_subscription_token_is_passed_and_nothing_else(monkeypatch, tmp_path):
     env = run_eval.run_env(tmp_path / "home")
     assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok-123"
     assert "ANTHROPIC_API_KEY" not in env
+
+
+def test_session_runs_outside_the_eval_repo(tmp_path):
+    run(tmp_path, "--arm", "baseline")
+    transcript = tmp_path / "pilot" / SCENARIO / "baseline" / "r1" / "transcript.jsonl"
+    cwd = Path(json.loads(transcript.read_text().splitlines()[0])["cwd"])
+    assert run_eval.ROOT not in cwd.parents
+    assert (tmp_path / "pilot" / SCENARIO / "baseline" / "r1" / "repo" / "stub_note.txt").is_file()
+
+
+def test_eval_repo_cwd_or_path_in_transcript_fails(tmp_path):
+    home = fake_user_home(tmp_path)
+    inside = {**REAL_INIT, "cwd": str(run_eval.ROOT / "runs" / "x" / "repo")}
+    assert any("inside the eval repo" in p for p in isolation(tmp_path, "primer", inside, home))
+    transcript = tmp_path / "t2.jsonl"
+    grep = {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "name": "Bash",
+                    "input": {"command": f"grep -r x {run_eval.ROOT}"},
+                }
+            ]
+        },
+    }
+    transcript.write_text(json.dumps(REAL_INIT) + "\n" + json.dumps(grep) + "\n")
+    problems = run_eval.check_isolation("primer", transcript, home)
+    assert any("referenced the eval repo" in p for p in problems)

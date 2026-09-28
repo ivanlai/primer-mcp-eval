@@ -34,6 +34,7 @@ emit(
         "tools": tools,
         "mcp_servers": [{"name": n, "status": "connected"} for n in names],
         "home": os.environ["HOME"],
+        "cwd": os.getcwd(),
         "skills": ["debug", "simplify"],
         "agents": ["general-purpose", "Plan"],
         "plugins": [{"name": "telemetry", "path": "builtin"}],
