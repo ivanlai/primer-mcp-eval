@@ -1,0 +1,16 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..72b28e0 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -96,6 +96,11 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+         return 0
+     print(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
+     print(f"Daily average:  {format_amount(summary.daily_average_pence)}")
++    largest = max(in_month(store.all(), year, month), key=lambda e: e.amount_pence)
++    print(
++        f"Largest:        {format_amount(largest.amount_pence)} {largest.category}"
++        f" on {largest.date.isoformat()} (#{largest.id})"
++    )
+     print("By category:")
+     for item in summary.by_category:
+         print(

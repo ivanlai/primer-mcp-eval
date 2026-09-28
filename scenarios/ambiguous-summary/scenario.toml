@@ -1,0 +1,2 @@
+kind = "ambiguous"
+expected_files = ["src/expenses/*.py"]
