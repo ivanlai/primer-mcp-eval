@@ -142,3 +142,25 @@ def test_user_skill_agent_plugin_or_memory_leaks_fail(tmp_path):
     ]
     for leak in leaks:
         assert isolation(tmp_path, "primer", {**REAL_INIT, **leak}, home), leak
+
+
+def test_redo_failed_reruns_only_failed_runs(tmp_path):
+    run(tmp_path, "--arm", "baseline")
+    meta_file = tmp_path / "pilot" / SCENARIO / "baseline" / "r1" / "meta.json"
+    meta = json.loads(meta_file.read_text())
+    meta["exit_code"] = 1
+    meta_file.write_text(json.dumps(meta))
+    run(tmp_path, "--arm", "baseline")  # without the flag: skipped, still failed
+    assert json.loads(meta_file.read_text())["exit_code"] == 1
+    run(tmp_path, "--arm", "baseline", "--redo-failed")
+    assert json.loads(meta_file.read_text())["exit_code"] == 0
+
+
+def test_subscription_token_is_passed_and_nothing_else(monkeypatch, tmp_path):
+    monkeypatch.setattr(run_eval, "TOKEN_FILE", tmp_path / "oauth-token")
+    (tmp_path / "oauth-token").write_text("tok-123\n")
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "key-456")
+    env = run_eval.run_env(tmp_path / "home")
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok-123"
+    assert "ANTHROPIC_API_KEY" not in env

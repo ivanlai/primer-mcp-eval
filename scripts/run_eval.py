@@ -13,7 +13,10 @@ Usage:
   python3 scripts/run_eval.py --batch pilot [--scenario ID ...] [--arm baseline|primer ...]
                               [--reps N] [--dry-run] [--claude PATH]
 
-Real runs need ANTHROPIC_API_KEY: the isolated HOME has no stored login.
+Real runs need credentials passed in explicitly, because the isolated HOME has no stored
+login: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`, which uses a Claude subscription)
+in the environment or in ~/.config/primer-mcp-eval/oauth-token, or ANTHROPIC_API_KEY.
+--redo-failed reruns runs that exited non-zero or failed the isolation check.
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ FIXTURE = "fixtures/app"
 ARMS = ("baseline", "primer")
 BATCHES = ("pilot", "headline")
 PROJECT_NAME = "expenses"
+TOKEN_FILE = Path.home() / ".config" / "primer-mcp-eval" / "oauth-token"
 
 
 def load_config() -> dict:
@@ -112,10 +116,23 @@ def claude_command(claude: str, cfg: dict, mcp_file: Path) -> list[str]:
     ]
 
 
+def credentials() -> dict:
+    """The one credential passed to runs: a subscription token, else an API key."""
+    token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+    if not token and TOKEN_FILE.is_file():
+        token = TOKEN_FILE.read_text().strip()
+    if token:
+        return {"CLAUDE_CODE_OAUTH_TOKEN": token}
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return {"ANTHROPIC_API_KEY": os.environ["ANTHROPIC_API_KEY"]}
+    return {}
+
+
 def run_env(home: Path) -> dict:
     """Real PATH and package caches, but an empty HOME and no inherited Claude settings."""
-    keep = ("PATH", "LANG", "LC_ALL", "TERM", "ANTHROPIC_API_KEY", "TMPDIR")
+    keep = ("PATH", "LANG", "LC_ALL", "TERM", "TMPDIR")
     env = {k: os.environ[k] for k in keep if k in os.environ}
+    env.update(credentials())
     env["HOME"] = str(home)
     env["XDG_CONFIG_HOME"] = str(home / ".config")
     env["UV_CACHE_DIR"] = os.environ.get("UV_CACHE_DIR", str(Path.home() / ".cache" / "uv"))
@@ -186,7 +203,10 @@ def run_one(run_dir: Path, scenario: str, arm: str, cfg: dict, claude: str, dry_
         if dry_run:
             print(f"--- {run_dir}")
             print("command:", " ".join(cmd))
-            print("env:", {k: ("<set>" if "KEY" in k else v) for k, v in env.items()})
+            secret = ("KEY", "TOKEN")
+            print(
+                "env:", {k: ("<set>" if any(s in k for s in secret) else v) for k, v in env.items()}
+            )
             print("mcp:", mcp_file.read_text().strip())
             print("prompt:", prompt)
             return {"dry_run": True}
@@ -242,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--arm", action="append", choices=ARMS, help="arm (default: both)")
     parser.add_argument("--reps", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true", help="print, don't run")
+    parser.add_argument("--redo-failed", action="store_true", help="rerun failed runs")
     parser.add_argument("--claude", help="claude binary (default: from PATH; tests use a stub)")
     parser.add_argument("--runs-dir", type=Path, default=RUNS, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -252,8 +273,11 @@ def main(argv: list[str] | None = None) -> int:
         sys.exit("claude not found on PATH")
     if not args.claude:
         check_cli_version(claude, cfg["pins"]["claude_cli"])
-        if not args.dry_run and "ANTHROPIC_API_KEY" not in os.environ:
-            sys.exit("ANTHROPIC_API_KEY is not set; the isolated HOME has no stored login")
+        if not args.dry_run and not credentials():
+            sys.exit(
+                "no credentials: run `claude setup-token` and put the token in "
+                f"{TOKEN_FILE} (or set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY)"
+            )
 
     scenarios = args.scenario or sorted(p.parent.name for p in SCENARIOS.glob("*/scenario.toml"))
     arms = args.arm or list(ARMS)
@@ -263,8 +287,12 @@ def main(argv: list[str] | None = None) -> int:
             for rep in range(1, args.reps + 1):
                 run_dir = args.runs_dir / args.batch / scenario / arm / f"r{rep}"
                 if (run_dir / "meta.json").exists():
-                    print(f"skip  {run_dir.relative_to(args.runs_dir)} (already done)")
-                    continue
+                    done = json.loads((run_dir / "meta.json").read_text())
+                    failed = done["exit_code"] != 0 or done["isolation_problems"]
+                    if not (args.redo_failed and failed):
+                        print(f"skip  {run_dir.relative_to(args.runs_dir)} (already done)")
+                        continue
+                    shutil.rmtree(run_dir)
                 meta = run_one(run_dir, scenario, arm, cfg, claude, args.dry_run)
                 if args.dry_run:
                     continue
