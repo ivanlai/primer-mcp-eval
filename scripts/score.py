@@ -13,8 +13,8 @@ Metric rules (the hand-read sample in the pilot checks these):
 - durable_record: the final repo has a Markdown file added or changed since the initial
   commit (committed or not). primer tickets, ADRs and plan or notes documents all count.
 - verified: a Bash call running pytest came after the last code edit. Blank when no edit.
-- out_of_scope: number of changed files, other than Markdown and tests/, matching none of
-  the scenario's expected_files.
+- out_of_scope: number of changed files, other than Markdown, tests/ and primer/ (the
+  ticket store and its generated graph), matching none of the scenario's expected_files.
 - functional: the scenario's check passes on a copy of the final repo. repo_tests records
   whether the repo's own suite (as the agent left it) also passes.
 - asked: the run made no code edit and its final message contains a question.
@@ -145,7 +145,7 @@ def score_run(run_dir: Path) -> dict:
         f
         for f in changed
         if not is_markdown(f)
-        and not f.startswith("tests/")
+        and not f.startswith(("tests/", "primer/"))
         and not any(fnmatch.fnmatch(f, g) for g in spec["expected_files"])
     ]
     functional, repo_tests = check_result(repo, scenario)

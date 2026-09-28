@@ -153,3 +153,8 @@ def test_plan_agent_counts_as_planning(tmp_path):
     assert score.score_run(make_run(tmp_path, calls))["planned_first"] is True
     other = [call("Task", subagent_type="Explore"), call("Edit", file_path="src/a.py")]
     assert score.score_run(make_run(tmp_path / "b", other))["planned_first"] is False
+
+
+def test_primer_store_files_are_not_out_of_scope(tmp_path):
+    extra = {"primer/graph.html": "<html/>", "primer/config.yaml": "x: 1\n"}
+    assert score.score_run(make_run(tmp_path, [], extra=extra))["out_of_scope"] == 0
