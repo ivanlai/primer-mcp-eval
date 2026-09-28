@@ -13,6 +13,7 @@ Usage: python3 scripts/validate_tasks.py [task-id ...]
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 import subprocess
@@ -99,7 +100,9 @@ def validate(task: Path) -> list[str]:
 
     patch = patch_file.read_text()
     outside = sorted(
-        f for f in patched_files(patch) if f not in expected and not f.startswith("tests/")
+        f
+        for f in patched_files(patch)
+        if not f.startswith("tests/") and not any(fnmatch.fnmatch(f, g) for g in expected)
     )
     if outside:
         problems.append(f"reference changes files outside expected_files: {outside}")

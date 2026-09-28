@@ -24,11 +24,11 @@ kind = "bug"                                   # feature | bug | refactor | triv
 expected_files = ["src/expenses/reports.py"]   # paths relative to the fixture root
 ```
 
-`expected_files` lists the source files a reasonable solution changes, for the scope metric. Files under `tests/` are always in scope, and planning or notes files are scored separately (ADR-004), so neither is listed here.
+`expected_files` lists the source files a reasonable solution changes, for the scope metric. Entries may be glob patterns (`src/expenses/*.py`) where a solution may add modules whose names can't be known in advance. Files under `tests/` are always in scope, and planning or notes files are scored separately (ADR-004), so neither is listed here.
 
 ## Checks
 
-Checks drive only the CLI (`expenses.cli.main`), so a fix that restructures the internals is still judged on behaviour. Run a check from the root of a fixture copy:
+Checks drive only the CLI (`expenses.cli.main`), so a fix that restructures the internals is still judged on behaviour. A check asserts only what the prompt states: it is a guardrail that the work was done (ADR-004), not a hunt for edge cases, and every unstated trap is a way for a reasonable solution to fail. Run a check from the root of a fixture copy:
 
 ```
 uv run pytest -p no:cacheprovider --confcutdir=<repo>/tasks <repo>/tasks/<task-id>

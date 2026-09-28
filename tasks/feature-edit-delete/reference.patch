@@ -1,0 +1,131 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..f02f6df 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -1,4 +1,4 @@
+-"""Command-line interface: expenses add | list | categories | summary."""
++"""Command-line interface: expenses add | list | edit | delete | categories | summary."""
+ 
+ from __future__ import annotations
+ 
+@@ -17,7 +17,7 @@ from expenses.models import (
+     parse_month,
+ )
+ from expenses.reports import in_category, in_month, month_summary
+-from expenses.storage import ExpenseStore, StorageError, default_path
++from expenses.storage import ExpenseStore, NotFoundError, StorageError, default_path
+ 
+ 
+ def build_parser() -> argparse.ArgumentParser:
+@@ -40,6 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
+     lst.add_argument("--month", help="only this month, as YYYY-MM")
+     lst.add_argument("--category", help="only this category")
+ 
++    edit = sub.add_parser("edit", help="change an expense")
++    edit.add_argument("id", type=int, help="expense id")
++    edit.add_argument("--amount", help="new amount")
++    edit.add_argument("--category", help="new category")
++    edit.add_argument("--note", help="new note")
++    edit.add_argument("--date", help="new date as YYYY-MM-DD")
++
++    delete = sub.add_parser("delete", help="remove an expense")
++    delete.add_argument("id", type=int, help="expense id")
++
+     sub.add_parser("categories", help="list categories in use")
+ 
+     summary = sub.add_parser("summary", help="summarise one month")
+@@ -77,6 +87,29 @@ def cmd_list(store: ExpenseStore, args: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def cmd_edit(store: ExpenseStore, args: argparse.Namespace) -> int:
++    changes = {}
++    if args.amount is not None:
++        changes["amount_pence"] = parse_amount(args.amount)
++    if args.category is not None:
++        changes["category"] = normalise_category(args.category)
++    if args.note is not None:
++        changes["note"] = args.note.strip()
++    if args.date is not None:
++        changes["date"] = parse_date(args.date)
++    if not changes:
++        raise ValidationError("nothing to change: pass --amount, --category, --note or --date")
++    expense = store.update(args.id, **changes)
++    print(f"Updated #{expense.id}: {format_amount(expense.amount_pence)} {expense.category}")
++    return 0
++
++
++def cmd_delete(store: ExpenseStore, args: argparse.Namespace) -> int:
++    expense = store.delete(args.id)
++    print(f"Deleted #{expense.id}")
++    return 0
++
++
+ def cmd_categories(store: ExpenseStore, args: argparse.Namespace) -> int:
+     categories = store.categories()
+     if not categories:
+@@ -108,6 +141,8 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+ COMMANDS = {
+     "add": cmd_add,
+     "list": cmd_list,
++    "edit": cmd_edit,
++    "delete": cmd_delete,
+     "categories": cmd_categories,
+     "summary": cmd_summary,
+ }
+@@ -118,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
+     try:
+         store = ExpenseStore(args.file or default_path())
+         return COMMANDS[args.command](store, args)
+-    except (ValidationError, StorageError) as exc:
++    except (ValidationError, StorageError, NotFoundError) as exc:
+         print(f"error: {exc}", file=sys.stderr)
+         return 1
+ 
+diff --git a/src/expenses/storage.py b/src/expenses/storage.py
+index 314ad11..7390fb6 100644
+--- a/src/expenses/storage.py
++++ b/src/expenses/storage.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ import json
+ import os
++from dataclasses import replace
+ from datetime import date
+ from pathlib import Path
+ 
+@@ -17,6 +18,10 @@ class StorageError(Exception):
+     """Raised when the data file exists but cannot be read."""
+ 
+ 
++class NotFoundError(Exception):
++    """Raised when no expense has the given id."""
++
++
+ def default_path() -> Path:
+     override = os.environ.get(ENV_VAR)
+     return Path(override) if override else DEFAULT_PATH
+@@ -64,6 +69,23 @@ class ExpenseStore:
+         self._save()
+         return expense
+ 
++    def _index(self, expense_id: int) -> int:
++        for i, expense in enumerate(self._expenses):
++            if expense.id == expense_id:
++                return i
++        raise NotFoundError(f"no expense with id {expense_id}")
++
++    def delete(self, expense_id: int) -> Expense:
++        expense = self._expenses.pop(self._index(expense_id))
++        self._save()
++        return expense
++
++    def update(self, expense_id: int, **changes) -> Expense:
++        i = self._index(expense_id)
++        self._expenses[i] = replace(self._expenses[i], **changes)
++        self._save()
++        return self._expenses[i]
++
+     def all(self) -> list[Expense]:
+         """Every expense, oldest first (ties broken by id)."""
+         return sorted(self._expenses, key=lambda e: (e.date, e.id))

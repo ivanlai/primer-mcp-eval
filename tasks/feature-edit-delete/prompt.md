@@ -1,0 +1,1 @@
+I need a way to correct mistakes. Add `expenses delete ID` to remove an expense, and `expenses edit ID` to change one, taking any of `--amount`, `--category`, `--note` and `--date` and leaving the other fields as they were. Using an ID that does not exist should be an error. The ID of a deleted expense must never be given to a new one.
