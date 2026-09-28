@@ -8,7 +8,8 @@ Metric rules (the hand-read sample in the pilot checks these):
   Edits made through Bash (sed -i, redirection) are not seen; the pilot checks how often.
 - planned_first: before the first code edit, the session called an in-session planning
   tool (TodoWrite, TaskCreate, TaskUpdate; headless 2.1.283 lists none of them up front),
-  the built-in Plan agent (Task with subagent_type "Plan"), any primer-mcp tool, or wrote a
+  the built-in Plan agent (Task with subagent_type "Plan"), a primer-mcp tool that creates
+  or records a ticket (reading tools such as list_tickets don't count), or wrote a
   Markdown file. A plan written only as chat text does not count. Blank when no code edit.
 - durable_record: the final repo has a Markdown file added or changed since the initial
   commit (committed or not). primer tickets, ADRs and plan or notes documents all count.
@@ -43,6 +44,7 @@ from validate_scenarios import SCENARIOS, pytest  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 PLAN_TOOLS = {"TodoWrite", "TaskCreate", "TaskUpdate"}
+PRIMER_PLANNING = {"plan_epic", "record_adr", "create_story", "create_task", "create_spike"}
 RATE_METRICS = ["planned_first", "durable_record", "verified", "functional", "repo_tests", "asked"]
 FIELDS = [
     "scenario", "kind", "arm", "rep", *RATE_METRICS, "out_of_scope",
@@ -92,7 +94,7 @@ def is_planning(call: dict) -> bool:
     return (
         name in PLAN_TOOLS
         or (name == "Task" and call.get("input", {}).get("subagent_type") == "Plan")
-        or name.startswith("mcp__primer-mcp__")
+        or name.removeprefix("mcp__primer-mcp__") in PRIMER_PLANNING
         or (path is not None and is_markdown(path))
     )
 

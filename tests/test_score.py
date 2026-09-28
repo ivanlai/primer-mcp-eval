@@ -158,3 +158,8 @@ def test_plan_agent_counts_as_planning(tmp_path):
 def test_primer_store_files_are_not_out_of_scope(tmp_path):
     extra = {"primer/graph.html": "<html/>", "primer/config.yaml": "x: 1\n"}
     assert score.score_run(make_run(tmp_path, [], extra=extra))["out_of_scope"] == 0
+
+
+def test_reading_primer_tickets_is_not_planning(tmp_path):
+    calls = [call("mcp__primer-mcp__list_tickets"), call("Edit", file_path="src/a.py")]
+    assert score.score_run(make_run(tmp_path, calls))["planned_first"] is False

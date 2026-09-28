@@ -51,7 +51,19 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 
 ## Results
 
-*Pending.* The pilot is running. Headline results will be published here, with the per-arm rates, intervals, per-scenario differences and cost, once the 72 headline runs are complete.
+*Headline runs pending.* Results will be published here, with per-arm rates, intervals, per-scenario differences and cost, once the 72 headline runs are complete.
+
+**Pilot** (24 runs, 1 per scenario per arm, used to test the pipeline; not the headline, and too small to conclude from): [`results/pilot/summary.md`](results/pilot/summary.md).
+
+| Metric | Baseline | primer-mcp |
+|---|---|---|
+| Planned before first code edit | 0% | 45% |
+| Left a durable record | 0% | 42% |
+| Verified before finishing | 100% | 100% |
+| Functional pass | 100% | 92% |
+| Mean turns / time / est. cost | 18 / 62s / $0.28 | 29 / 85s / $0.41 |
+
+The pattern in the pilot: on the four features and the ambiguous request, the primer-mcp agent planned first and left tickets every time, and the baseline never did. On bug fixes, refactors and trivial changes both arms behaved alike. In one trivial scenario, the primer-mcp agent stopped to propose a ticket and ask for approval, despite being told no one would answer, so the work was never done.
 
 ## Verdict
 
