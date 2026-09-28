@@ -10,7 +10,7 @@ from expenses.models import Expense
 
 
 def in_month(expenses: list[Expense], year: int, month: int) -> list[Expense]:
-    return [e for e in expenses if e.date.year == year and e.date.month == month]
+    return [e for e in expenses if e.date.month == month]
 
 
 def in_category(expenses: list[Expense], category: str) -> list[Expense]:

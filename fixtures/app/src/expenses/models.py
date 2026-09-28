@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
 
 
 class ValidationError(ValueError):
@@ -38,14 +38,14 @@ class Expense:
 def parse_amount(text: str) -> int:
     """Parse a user-entered amount such as "12.50" into whole pence."""
     try:
-        value = Decimal(text.strip())
-    except InvalidOperation:
+        value = float(text.strip())
+    except ValueError:
         raise ValidationError(f"not a valid amount: {text!r}") from None
-    if not value.is_finite():
+    if not math.isfinite(value):
         raise ValidationError(f"not a valid amount: {text!r}")
     if value <= 0:
         raise ValidationError("amount must be greater than zero")
-    if value.as_tuple().exponent < -2:
+    if round(value, 2) != value:
         raise ValidationError("amount can have at most two decimal places")
     return int(value * 100)
 

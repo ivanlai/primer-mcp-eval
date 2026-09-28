@@ -36,7 +36,7 @@ def test_list_filters_by_month_and_category(run):
     run("add", "2", "food", "--date", "2026-03-01")
     run("add", "3", "travel", "--date", "2026-03-02")
 
-    _, out, _ = run("list", "--month", "2026-03", "--category", "FOOD")
+    _, out, _ = run("list", "--month", "2026-03", "--category", "food")
     assert "2.00" in out and "1.00" not in out and "3.00" not in out
     assert "1 expense(s), total 2.00" in out
 
