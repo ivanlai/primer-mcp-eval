@@ -62,9 +62,7 @@ def parse_date(text: str) -> date:
     try:
         return date.fromisoformat(text)
     except ValueError:
-        raise ValidationError(
-            f"not a valid date (expected YYYY-MM-DD): {text!r}"
-        ) from None
+        raise ValidationError(f"not a valid date (expected YYYY-MM-DD): {text!r}") from None
 
 
 def parse_month(text: str) -> tuple[int, int]:

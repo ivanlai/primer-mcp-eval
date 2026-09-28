@@ -21,12 +21,8 @@ from expenses.storage import ExpenseStore, StorageError, default_path
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="expenses", description="Track your spending."
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    parser = argparse.ArgumentParser(prog="expenses", description="Track your spending.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "--file",
         type=Path,
@@ -57,9 +53,7 @@ def cmd_add(store: ExpenseStore, args: argparse.Namespace) -> int:
     category = normalise_category(args.category)
     when = parse_date(args.date) if args.date else date.today()
     expense = store.add(when, amount, category, args.note.strip())
-    print(
-        f"Added #{expense.id}: {format_amount(amount)} {category} on {when.isoformat()}"
-    )
+    print(f"Added #{expense.id}: {format_amount(amount)} {category} on {when.isoformat()}")
     return 0
 
 
@@ -100,9 +94,7 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
     if not summary.count:
         print("No expenses this month.")
         return 0
-    print(
-        f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)"
-    )
+    print(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
     print(f"Daily average:  {format_amount(summary.daily_average_pence)}")
     print("By category:")
     for item in summary.by_category:

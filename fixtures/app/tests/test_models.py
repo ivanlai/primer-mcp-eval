@@ -49,9 +49,7 @@ def test_parse_month():
     assert parse_month("2026-03") == (2026, 3)
 
 
-@pytest.mark.parametrize(
-    "text", ["2026-00", "2026-13", "26-03", "2026/03", "2026-03-01"]
-)
+@pytest.mark.parametrize("text", ["2026-00", "2026-13", "26-03", "2026/03", "2026-03-01"])
 def test_parse_month_rejects_invalid(text):
     with pytest.raises(ValidationError):
         parse_month(text)
@@ -67,7 +65,5 @@ def test_normalise_category_rejects_blank():
 
 
 def test_expense_round_trips_through_dict():
-    expense = Expense(
-        id=3, date=date(2026, 3, 1), amount_pence=1250, category="food", note="lunch"
-    )
+    expense = Expense(id=3, date=date(2026, 3, 1), amount_pence=1250, category="food", note="lunch")
     assert Expense.from_dict(expense.to_dict()) == expense

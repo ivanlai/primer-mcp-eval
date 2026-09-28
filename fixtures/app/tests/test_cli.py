@@ -16,9 +16,7 @@ def run(tmp_path, capsys):
 
 
 def test_add_and_list(run):
-    assert (
-        run("add", "12.50", "Food", "--date", "2026-03-01", "--note", "lunch")[0] == 0
-    )
+    assert run("add", "12.50", "Food", "--date", "2026-03-01", "--note", "lunch")[0] == 0
     assert run("add", "3", "travel", "--date", "2026-03-02")[0] == 0
 
     code, out, _ = run("list")

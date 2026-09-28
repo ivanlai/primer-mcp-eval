@@ -51,9 +51,7 @@ class ExpenseStore:
         tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         tmp.replace(self.path)
 
-    def add(
-        self, when: date, amount_pence: int, category: str, note: str = ""
-    ) -> Expense:
+    def add(self, when: date, amount_pence: int, category: str, note: str = "") -> Expense:
         expense = Expense(
             id=self._next_id,
             date=when,
