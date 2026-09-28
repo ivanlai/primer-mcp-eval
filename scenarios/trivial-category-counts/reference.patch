@@ -1,0 +1,71 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..36dba0e 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -82,8 +82,8 @@ def cmd_categories(store: ExpenseStore, args: argparse.Namespace) -> int:
+     if not categories:
+         print("No categories yet.")
+         return 0
+-    for category in categories:
+-        print(category)
++    for category, count in categories.items():
++        print(f"{category} ({count})")
+     return 0
+ 
+ 
+diff --git a/src/expenses/storage.py b/src/expenses/storage.py
+index 314ad11..cc4b824 100644
+--- a/src/expenses/storage.py
++++ b/src/expenses/storage.py
+@@ -3,6 +3,7 @@
+ from __future__ import annotations
+ 
+ import json
++from collections import Counter
+ import os
+ from datetime import date
+ from pathlib import Path
+@@ -68,5 +69,6 @@ class ExpenseStore:
+         """Every expense, oldest first (ties broken by id)."""
+         return sorted(self._expenses, key=lambda e: (e.date, e.id))
+ 
+-    def categories(self) -> list[str]:
+-        return sorted({e.category for e in self._expenses})
++    def categories(self) -> dict[str, int]:
++        """Number of expenses per category, by category name."""
++        return dict(sorted(Counter(e.category for e in self._expenses).items()))
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 50283eb..32ce2b4 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -48,7 +48,7 @@ def test_list_empty(run):
+ def test_categories(run):
+     run("add", "1", "travel", "--date", "2026-03-01")
+     run("add", "1", "food", "--date", "2026-03-01")
+-    assert run("categories")[1].split() == ["food", "travel"]
++    assert run("categories")[1].splitlines() == ["food (1)", "travel (1)"]
+ 
+ 
+ def test_summary(run):
+diff --git a/tests/test_storage.py b/tests/test_storage.py
+index 9d67521..ec54743 100644
+--- a/tests/test_storage.py
++++ b/tests/test_storage.py
+@@ -8,7 +8,7 @@ from expenses.storage import ExpenseStore, StorageError, default_path
+ def test_new_store_is_empty(tmp_path):
+     store = ExpenseStore(tmp_path / "data.json")
+     assert store.all() == []
+-    assert store.categories() == []
++    assert store.categories() == {}
+ 
+ 
+ def test_add_persists_and_assigns_ids(tmp_path):
+@@ -35,7 +35,7 @@ def test_categories_are_unique_and_sorted(tmp_path):
+     store = ExpenseStore(tmp_path / "data.json")
+     for category in ["travel", "food", "travel", "bills"]:
+         store.add(date(2026, 3, 1), 100, category)
+-    assert store.categories() == ["bills", "food", "travel"]
++    assert store.categories() == {"bills": 1, "food": 1, "travel": 2}
+ 
+ 
+ def test_creates_missing_parent_directory(tmp_path):

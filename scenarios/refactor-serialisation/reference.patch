@@ -1,0 +1,134 @@
+diff --git a/src/expenses/models.py b/src/expenses/models.py
+index 784765f..0bab2fb 100644
+--- a/src/expenses/models.py
++++ b/src/expenses/models.py
+@@ -3,7 +3,7 @@
+ from __future__ import annotations
+ 
+ import math
+-from dataclasses import asdict, dataclass
++from dataclasses import dataclass
+ from datetime import date
+ 
+ 
+@@ -19,21 +19,6 @@ class Expense:
+     category: str
+     note: str = ""
+ 
+-    def to_dict(self) -> dict:
+-        data = asdict(self)
+-        data["date"] = self.date.isoformat()
+-        return data
+-
+-    @classmethod
+-    def from_dict(cls, data: dict) -> Expense:
+-        return cls(
+-            id=int(data["id"]),
+-            date=date.fromisoformat(data["date"]),
+-            amount_pence=int(data["amount_pence"]),
+-            category=data["category"],
+-            note=data.get("note", ""),
+-        )
+-
+ 
+ def parse_amount(text: str) -> int:
+     """Parse a user-entered amount such as "12.50" into whole pence."""
+diff --git a/src/expenses/storage.py b/src/expenses/storage.py
+index 314ad11..305df53 100644
+--- a/src/expenses/storage.py
++++ b/src/expenses/storage.py
+@@ -13,6 +13,26 @@ DEFAULT_PATH = Path.home() / ".expenses.json"
+ ENV_VAR = "EXPENSES_FILE"
+ 
+ 
++def expense_to_dict(expense: Expense) -> dict:
++    return {
++        "id": expense.id,
++        "date": expense.date.isoformat(),
++        "amount_pence": expense.amount_pence,
++        "category": expense.category,
++        "note": expense.note,
++    }
++
++
++def expense_from_dict(data: dict) -> Expense:
++    return Expense(
++        id=int(data["id"]),
++        date=date.fromisoformat(data["date"]),
++        amount_pence=int(data["amount_pence"]),
++        category=data["category"],
++        note=data.get("note", ""),
++    )
++
++
+ class StorageError(Exception):
+     """Raised when the data file exists but cannot be read."""
+ 
+@@ -36,7 +56,7 @@ class ExpenseStore:
+             return
+         try:
+             data = json.loads(self.path.read_text(encoding="utf-8"))
+-            self._expenses = [Expense.from_dict(item) for item in data["expenses"]]
++            self._expenses = [expense_from_dict(item) for item in data["expenses"]]
+             self._next_id = int(data["next_id"])
+         except (OSError, ValueError, KeyError, TypeError) as exc:
+             raise StorageError(f"cannot read {self.path}: {exc}") from exc
+@@ -44,7 +64,7 @@ class ExpenseStore:
+     def _save(self) -> None:
+         data = {
+             "next_id": self._next_id,
+-            "expenses": [e.to_dict() for e in self._expenses],
++            "expenses": [expense_to_dict(e) for e in self._expenses],
+         }
+         self.path.parent.mkdir(parents=True, exist_ok=True)
+         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+diff --git a/tests/test_models.py b/tests/test_models.py
+index ae745a5..22f818c 100644
+--- a/tests/test_models.py
++++ b/tests/test_models.py
+@@ -3,7 +3,6 @@ from datetime import date
+ import pytest
+ 
+ from expenses.models import (
+-    Expense,
+     ValidationError,
+     format_amount,
+     normalise_category,
+@@ -62,8 +61,3 @@ def test_normalise_category():
+ def test_normalise_category_rejects_blank():
+     with pytest.raises(ValidationError):
+         normalise_category("   ")
+-
+-
+-def test_expense_round_trips_through_dict():
+-    expense = Expense(id=3, date=date(2026, 3, 1), amount_pence=1250, category="food", note="lunch")
+-    assert Expense.from_dict(expense.to_dict()) == expense
+diff --git a/tests/test_storage.py b/tests/test_storage.py
+index 9d67521..045d270 100644
+--- a/tests/test_storage.py
++++ b/tests/test_storage.py
+@@ -2,7 +2,14 @@ from datetime import date
+ 
+ import pytest
+ 
+-from expenses.storage import ExpenseStore, StorageError, default_path
++from expenses.models import Expense
++from expenses.storage import (
++    ExpenseStore,
++    StorageError,
++    default_path,
++    expense_from_dict,
++    expense_to_dict,
++)
+ 
+ 
+ def test_new_store_is_empty(tmp_path):
+@@ -54,3 +61,8 @@ def test_corrupt_file_raises_storage_error(tmp_path):
+ def test_default_path_honours_environment(tmp_path, monkeypatch):
+     monkeypatch.setenv("EXPENSES_FILE", str(tmp_path / "custom.json"))
+     assert default_path() == tmp_path / "custom.json"
++
++
++def test_expense_round_trips_through_dict():
++    expense = Expense(id=3, date=date(2026, 3, 1), amount_pence=1250, category="food", note="lunch")
++    assert expense_from_dict(expense_to_dict(expense)) == expense

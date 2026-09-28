@@ -1,0 +1,1 @@
+`Expense` in `models.py` has `to_dict` and `from_dict` methods that exist only for reading and writing the JSON data file. Move that conversion into `storage.py`, so `Expense` is a plain record that knows nothing about the file format. Existing data files must still load.
