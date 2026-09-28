@@ -1,0 +1,119 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..c2c7473 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -1,4 +1,4 @@
+-"""Command-line interface: expenses add | list | categories | summary."""
++"""Command-line interface: expenses add | list | categories | summary | export | import."""
+ 
+ from __future__ import annotations
+ 
+@@ -18,6 +18,7 @@ from expenses.models import (
+ )
+ from expenses.reports import in_category, in_month, month_summary
+ from expenses.storage import ExpenseStore, StorageError, default_path
++from expenses.transfer import export_csv, read_csv
+ 
+ 
+ def build_parser() -> argparse.ArgumentParser:
+@@ -45,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = sub.add_parser("summary", help="summarise one month")
+     summary.add_argument("month", help="month as YYYY-MM")
+ 
++    export = sub.add_parser("export", help="write all expenses to a CSV file")
++    export.add_argument("path", type=Path, help="CSV file to write")
++
++    imp = sub.add_parser("import", help="add expenses from a CSV file")
++    imp.add_argument("path", type=Path, help="CSV file with date,amount,category,note")
++
+     return parser
+ 
+ 
+@@ -105,11 +112,28 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def cmd_export(store: ExpenseStore, args: argparse.Namespace) -> int:
++    expenses = store.all()
++    export_csv(expenses, args.path)
++    print(f"Exported {len(expenses)} expense(s) to {args.path}")
++    return 0
++
++
++def cmd_import(store: ExpenseStore, args: argparse.Namespace) -> int:
++    rows = read_csv(args.path)
++    for when, amount, category, note in rows:
++        store.add(when, amount, category, note)
++    print(f"Imported {len(rows)} expense(s) from {args.path}")
++    return 0
++
++
+ COMMANDS = {
+     "add": cmd_add,
+     "list": cmd_list,
+     "categories": cmd_categories,
+     "summary": cmd_summary,
++    "export": cmd_export,
++    "import": cmd_import,
+ }
+ 
+ 
+diff --git a/src/expenses/transfer.py b/src/expenses/transfer.py
+new file mode 100644
+index 0000000..5e6d675
+--- /dev/null
++++ b/src/expenses/transfer.py
+@@ -0,0 +1,53 @@
++"""CSV export and import."""
++
++from __future__ import annotations
++
++import csv
++from datetime import date
++from pathlib import Path
++
++from expenses.models import (
++    Expense,
++    ValidationError,
++    format_amount,
++    normalise_category,
++    parse_amount,
++    parse_date,
++)
++
++FIELDS = ["date", "amount", "category", "note"]
++
++
++def export_csv(expenses: list[Expense], path: Path) -> None:
++    with path.open("w", newline="", encoding="utf-8") as f:
++        writer = csv.writer(f)
++        writer.writerow(FIELDS)
++        for e in expenses:
++            writer.writerow([e.date.isoformat(), format_amount(e.amount_pence), e.category, e.note])
++
++
++def read_csv(path: Path) -> list[tuple[date, int, str, str]]:
++    """Parse every row, or raise ValidationError naming each bad line."""
++    try:
++        with path.open(newline="", encoding="utf-8") as f:
++            reader = csv.DictReader(f)
++            if reader.fieldnames != FIELDS:
++                raise ValidationError(f"expected the header {','.join(FIELDS)}")
++            rows, errors = [], []
++            for row in reader:
++                try:
++                    rows.append(
++                        (
++                            parse_date(row["date"] or ""),
++                            parse_amount(row["amount"] or ""),
++                            normalise_category(row["category"] or ""),
++                            (row["note"] or "").strip(),
++                        )
++                    )
++                except ValidationError as exc:
++                    errors.append(f"line {reader.line_num}: {exc}")
++    except OSError as exc:
++        raise ValidationError(f"cannot read {path}: {exc}") from exc
++    if errors:
++        raise ValidationError("nothing imported; invalid rows:\n  " + "\n  ".join(errors))
++    return rows

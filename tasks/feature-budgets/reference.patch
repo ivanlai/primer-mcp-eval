@@ -1,0 +1,111 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..3471566 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -1,4 +1,4 @@
+-"""Command-line interface: expenses add | list | categories | summary."""
++"""Command-line interface: expenses add | list | categories | summary | budget."""
+ 
+ from __future__ import annotations
+ 
+@@ -45,6 +45,13 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = sub.add_parser("summary", help="summarise one month")
+     summary.add_argument("month", help="month as YYYY-MM")
+ 
++    budget = sub.add_parser("budget", help="manage monthly budgets")
++    budget_sub = budget.add_subparsers(dest="budget_command", required=True)
++    budget_set = budget_sub.add_parser("set", help="set a category's monthly budget")
++    budget_set.add_argument("category", help="category, e.g. groceries")
++    budget_set.add_argument("amount", help="monthly budget, e.g. 200")
++    budget_sub.add_parser("list", help="show budgets")
++
+     return parser
+ 
+ 
+@@ -96,12 +103,35 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+         return 0
+     print(f"Total:          {format_amount(summary.total_pence)} ({summary.count} expenses)")
+     print(f"Daily average:  {format_amount(summary.daily_average_pence)}")
++    budgets = store.budgets()
+     print("By category:")
+     for item in summary.by_category:
+-        print(
++        line = (
+             f"  {item.category:<16} {format_amount(item.total_pence):>10}"
+             f"  {item.share_percent:>3}%  ({item.count})"
+         )
++        if item.category in budgets:
++            limit = budgets[item.category]
++            left = limit - item.total_pence
++            status = f"{format_amount(left)} left" if left >= 0 else "over budget"
++            line += f"  budget {format_amount(limit)}: {status}"
++        print(line)
++    return 0
++
++
++def cmd_budget(store: ExpenseStore, args: argparse.Namespace) -> int:
++    if args.budget_command == "set":
++        category = normalise_category(args.category)
++        amount = parse_amount(args.amount)
++        store.set_budget(category, amount)
++        print(f"Budget for {category}: {format_amount(amount)} a month")
++        return 0
++    budgets = store.budgets()
++    if not budgets:
++        print("No budgets set.")
++        return 0
++    for category, amount in budgets.items():
++        print(f"{category:<16} {format_amount(amount):>10}")
+     return 0
+ 
+ 
+@@ -110,6 +140,7 @@ COMMANDS = {
+     "list": cmd_list,
+     "categories": cmd_categories,
+     "summary": cmd_summary,
++    "budget": cmd_budget,
+ }
+ 
+ 
+diff --git a/src/expenses/storage.py b/src/expenses/storage.py
+index 314ad11..357a9f4 100644
+--- a/src/expenses/storage.py
++++ b/src/expenses/storage.py
+@@ -29,6 +29,7 @@ class ExpenseStore:
+         self.path = path
+         self._next_id = 1
+         self._expenses: list[Expense] = []
++        self._budgets: dict[str, int] = {}
+         self._load()
+ 
+     def _load(self) -> None:
+@@ -38,6 +39,7 @@ class ExpenseStore:
+             data = json.loads(self.path.read_text(encoding="utf-8"))
+             self._expenses = [Expense.from_dict(item) for item in data["expenses"]]
+             self._next_id = int(data["next_id"])
++            self._budgets = {str(k): int(v) for k, v in data.get("budgets", {}).items()}
+         except (OSError, ValueError, KeyError, TypeError) as exc:
+             raise StorageError(f"cannot read {self.path}: {exc}") from exc
+ 
+@@ -45,6 +47,7 @@ class ExpenseStore:
+         data = {
+             "next_id": self._next_id,
+             "expenses": [e.to_dict() for e in self._expenses],
++            "budgets": self._budgets,
+         }
+         self.path.parent.mkdir(parents=True, exist_ok=True)
+         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+@@ -68,5 +71,13 @@ class ExpenseStore:
+         """Every expense, oldest first (ties broken by id)."""
+         return sorted(self._expenses, key=lambda e: (e.date, e.id))
+ 
++    def set_budget(self, category: str, amount_pence: int) -> None:
++        self._budgets[category] = amount_pence
++        self._save()
++
++    def budgets(self) -> dict[str, int]:
++        """Monthly budget per category, in pence."""
++        return dict(sorted(self._budgets.items()))
++
+     def categories(self) -> list[str]:
+         return sorted({e.category for e in self._expenses})

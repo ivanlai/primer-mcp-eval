@@ -1,0 +1,167 @@
+diff --git a/src/expenses/cli.py b/src/expenses/cli.py
+index efb8afa..aa2a8f8 100644
+--- a/src/expenses/cli.py
++++ b/src/expenses/cli.py
+@@ -1,4 +1,4 @@
+-"""Command-line interface: expenses add | list | categories | summary."""
++"""Command-line interface: expenses add | list | categories | summary | recurring."""
+ 
+ from __future__ import annotations
+ 
+@@ -45,6 +45,17 @@ def build_parser() -> argparse.ArgumentParser:
+     summary = sub.add_parser("summary", help="summarise one month")
+     summary.add_argument("month", help="month as YYYY-MM")
+ 
++    recurring = sub.add_parser("recurring", help="manage monthly recurring expenses")
++    rec_sub = recurring.add_subparsers(dest="recurring_command", required=True)
++    rec_add = rec_sub.add_parser("add", help="record a monthly recurring expense")
++    rec_add.add_argument("amount", help="amount, e.g. 950")
++    rec_add.add_argument("category", help="category, e.g. rent")
++    rec_add.add_argument("--day", type=int, required=True, help="day of the month (1-31)")
++    rec_add.add_argument("--note", default="", help="free-text note")
++    rec_sub.add_parser("list", help="show recurring expenses")
++    rec_apply = rec_sub.add_parser("apply", help="add a month's recurring expenses")
++    rec_apply.add_argument("month", help="month as YYYY-MM")
++
+     return parser
+ 
+ 
+@@ -105,11 +116,38 @@ def cmd_summary(store: ExpenseStore, args: argparse.Namespace) -> int:
+     return 0
+ 
+ 
++def cmd_recurring(store: ExpenseStore, args: argparse.Namespace) -> int:
++    if args.recurring_command == "add":
++        if not 1 <= args.day <= 31:
++            raise ValidationError("day must be between 1 and 31")
++        amount = parse_amount(args.amount)
++        category = normalise_category(args.category)
++        store.add_recurring(amount, category, args.day, args.note.strip())
++        print(f"Recurring: {format_amount(amount)} {category} on day {args.day} of each month")
++        return 0
++    if args.recurring_command == "apply":
++        year, month = parse_month(args.month)
++        added = store.apply_recurring(year, month)
++        print(f"Added {len(added)} recurring expense(s) for {year:04d}-{month:02d}")
++        return 0
++    rules = store.recurring()
++    if not rules:
++        print("No recurring expenses.")
++        return 0
++    for rule in rules:
++        line = f"day {rule.day:>2}  {format_amount(rule.amount_pence):>10}  {rule.category}"
++        if rule.note:
++            line += f"  ({rule.note})"
++        print(line)
++    return 0
++
++
+ COMMANDS = {
+     "add": cmd_add,
+     "list": cmd_list,
+     "categories": cmd_categories,
+     "summary": cmd_summary,
++    "recurring": cmd_recurring,
+ }
+ 
+ 
+diff --git a/src/expenses/storage.py b/src/expenses/storage.py
+index 314ad11..7de329b 100644
+--- a/src/expenses/storage.py
++++ b/src/expenses/storage.py
+@@ -2,8 +2,10 @@
+ 
+ from __future__ import annotations
+ 
++import calendar
+ import json
+ import os
++from dataclasses import dataclass, field
+ from datetime import date
+ from pathlib import Path
+ 
+@@ -22,6 +24,17 @@ def default_path() -> Path:
+     return Path(override) if override else DEFAULT_PATH
+ 
+ 
++@dataclass
++class Recurring:
++    """A monthly expense added on a fixed day; applied_months records "YYYY-MM"s done."""
++
++    amount_pence: int
++    category: str
++    day: int
++    note: str = ""
++    applied_months: list[str] = field(default_factory=list)
++
++
+ class ExpenseStore:
+     """All expenses in one JSON file, loaded on creation and saved on change."""
+ 
+@@ -29,6 +42,7 @@ class ExpenseStore:
+         self.path = path
+         self._next_id = 1
+         self._expenses: list[Expense] = []
++        self._recurring: list[Recurring] = []
+         self._load()
+ 
+     def _load(self) -> None:
+@@ -38,6 +52,7 @@ class ExpenseStore:
+             data = json.loads(self.path.read_text(encoding="utf-8"))
+             self._expenses = [Expense.from_dict(item) for item in data["expenses"]]
+             self._next_id = int(data["next_id"])
++            self._recurring = [Recurring(**item) for item in data.get("recurring", [])]
+         except (OSError, ValueError, KeyError, TypeError) as exc:
+             raise StorageError(f"cannot read {self.path}: {exc}") from exc
+ 
+@@ -45,6 +60,7 @@ class ExpenseStore:
+         data = {
+             "next_id": self._next_id,
+             "expenses": [e.to_dict() for e in self._expenses],
++            "recurring": [vars(r) for r in self._recurring],
+         }
+         self.path.parent.mkdir(parents=True, exist_ok=True)
+         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+@@ -52,6 +68,11 @@ class ExpenseStore:
+         tmp.replace(self.path)
+ 
+     def add(self, when: date, amount_pence: int, category: str, note: str = "") -> Expense:
++        expense = self._append(when, amount_pence, category, note)
++        self._save()
++        return expense
++
++    def _append(self, when: date, amount_pence: int, category: str, note: str) -> Expense:
+         expense = Expense(
+             id=self._next_id,
+             date=when,
+@@ -61,9 +82,29 @@ class ExpenseStore:
+         )
+         self._expenses.append(expense)
+         self._next_id += 1
+-        self._save()
+         return expense
+ 
++    def add_recurring(self, amount_pence: int, category: str, day: int, note: str = "") -> None:
++        self._recurring.append(Recurring(amount_pence, category, day, note))
++        self._save()
++
++    def recurring(self) -> list[Recurring]:
++        return list(self._recurring)
++
++    def apply_recurring(self, year: int, month: int) -> list[Expense]:
++        """Add this month's recurring expenses once; later calls for the month add nothing."""
++        key = f"{year:04d}-{month:02d}"
++        last_day = calendar.monthrange(year, month)[1]
++        added = []
++        for rule in self._recurring:
++            if key in rule.applied_months:
++                continue
++            when = date(year, month, min(rule.day, last_day))
++            added.append(self._append(when, rule.amount_pence, rule.category, rule.note))
++            rule.applied_months.append(key)
++        self._save()
++        return added
++
+     def all(self) -> list[Expense]:
+         """Every expense, oldest first (ties broken by id)."""
+         return sorted(self._expenses, key=lambda e: (e.date, e.id))

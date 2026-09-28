@@ -1,0 +1,2 @@
+kind = "feature"
+expected_files = ["src/expenses/*.py"]
