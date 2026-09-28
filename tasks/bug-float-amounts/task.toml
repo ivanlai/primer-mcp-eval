@@ -1,0 +1,2 @@
+kind = "bug"
+expected_files = ["src/expenses/models.py"]
