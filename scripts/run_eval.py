@@ -16,7 +16,10 @@ Usage:
 Real runs need credentials passed in explicitly, because the isolated HOME has no stored
 login: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`, which uses a Claude subscription)
 in the environment or in ~/.config/primer-mcp-eval/oauth-token, or ANTHROPIC_API_KEY.
---redo-failed reruns runs that exited non-zero or failed the isolation check.
+--redo-failed reruns runs that failed or failed the isolation check. --wait-on-limit makes
+an unattended batch ride out usage limits: a failed run is deleted, the runner waits (15
+minutes, doubling to an hour) and retries it, and stops after 4 retries of one run or
+8 hours of waiting in total.
 """
 
 from __future__ import annotations
@@ -39,6 +42,9 @@ FIXTURE = "fixtures/app"
 ARMS = ("baseline", "primer")
 BATCHES = ("pilot", "headline")
 PROJECT_NAME = "expenses"
+RETRY_WAITS_S = (900, 1800, 3600, 3600)  # per failed run, then give up on the batch
+MAX_TOTAL_WAIT_S = 8 * 3600
+SLEEP = time.sleep  # replaced in tests
 TOKEN_FILE = Path.home() / ".config" / "primer-mcp-eval" / "oauth-token"
 CLAUDE_VERSIONS = Path.home() / ".local" / "share" / "claude" / "versions"
 
@@ -163,6 +169,15 @@ def user_config_names(home: Path) -> tuple[set[str], set[str]]:
     return skills, agents
 
 
+def run_failed(exit_code: int | None, transcript: Path) -> bool:
+    """The session itself failed (limit, auth, crash), as opposed to the agent's work."""
+    if exit_code != 0:
+        return True
+    evs = [json.loads(line) for line in transcript.read_text().splitlines() if line.strip()]
+    result = next((e for e in reversed(evs) if e.get("type") == "result"), None)
+    return result is None or bool(result.get("is_error")) or any("error" in e for e in evs)
+
+
 def check_isolation(arm: str, transcript: Path, user_home: Path | None = None) -> list[str]:
     """Problems with what the session loaded, from its init event; empty means isolated."""
     event = init_event(transcript)
@@ -256,6 +271,7 @@ def run_one(run_dir: Path, scenario: str, arm: str, cfg: dict, claude: str, dry_
             "timed_out": timed_out,
             "duration_s": round(time.monotonic() - start, 1),
             "isolation_problems": check_isolation(arm, transcript),
+            "run_failed": timed_out or run_failed(exit_code, transcript),
         }
         shutil.copytree(
             repo, run_dir / "repo", symlinks=True, ignore=shutil.ignore_patterns(".venv")
@@ -278,6 +294,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reps", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true", help="print, don't run")
     parser.add_argument("--redo-failed", action="store_true", help="rerun failed runs")
+    parser.add_argument(
+        "--wait-on-limit", action="store_true", help="wait and retry failed runs (overnight)"
+    )
     parser.add_argument("--claude", help="claude binary (default: from PATH; tests use a stub)")
     parser.add_argument("--runs-dir", type=Path, default=RUNS, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -298,14 +317,15 @@ def main(argv: list[str] | None = None) -> int:
 
     scenarios = args.scenario or sorted(p.parent.name for p in SCENARIOS.glob("*/scenario.toml"))
     arms = args.arm or list(ARMS)
-    failures = 0
+    failures, waited = 0, 0
     for scenario in scenarios:
         for arm in arms:
             for rep in range(1, args.reps + 1):
                 run_dir = args.runs_dir / args.batch / scenario / arm / f"r{rep}"
                 if (run_dir / "meta.json").exists():
                     done = json.loads((run_dir / "meta.json").read_text())
-                    failed = done["exit_code"] != 0 or done["isolation_problems"]
+                    failed = done.get("run_failed", done["exit_code"] != 0)
+                    failed = failed or done["isolation_problems"]
                     if not (args.redo_failed and failed):
                         print(f"skip  {run_dir.relative_to(args.runs_dir)} (already done)")
                         continue
@@ -313,7 +333,18 @@ def main(argv: list[str] | None = None) -> int:
                 meta = run_one(run_dir, scenario, arm, cfg, claude, args.dry_run)
                 if args.dry_run:
                     continue
-                bad = meta["isolation_problems"] or meta["exit_code"] != 0
+                for wait in RETRY_WAITS_S if args.wait_on_limit else ():
+                    if not meta["run_failed"] or waited + wait > MAX_TOTAL_WAIT_S:
+                        break
+                    print(f"wait  {run_dir.relative_to(args.runs_dir)} failed; retry in {wait}s")
+                    shutil.rmtree(run_dir)
+                    SLEEP(wait)
+                    waited += wait
+                    meta = run_one(run_dir, scenario, arm, cfg, claude, args.dry_run)
+                if args.wait_on_limit and meta["run_failed"]:
+                    print(f"FAIL  {run_dir.relative_to(args.runs_dir)}: still failing, stopping")
+                    return 1
+                bad = meta["isolation_problems"] or meta["run_failed"]
                 failures += bool(bad)
                 status = "FAIL" if bad else "ok  "
                 print(f"{status}  {run_dir.relative_to(args.runs_dir)}  {meta['duration_s']}s")
