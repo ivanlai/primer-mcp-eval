@@ -136,14 +136,33 @@ def init_event(transcript: Path) -> dict | None:
     return None
 
 
-def check_isolation(arm: str, transcript: Path) -> list[str]:
+def user_config_names(home: Path) -> tuple[set[str], set[str]]:
+    """Names of the developer's own skills and agents, which must never reach a run."""
+    skills_dir, agents_dir = home / ".claude" / "skills", home / ".claude" / "agents"
+    skills = {p.name for p in skills_dir.iterdir()} if skills_dir.is_dir() else set()
+    agents = {p.stem for p in agents_dir.glob("*.md")} if agents_dir.is_dir() else set()
+    return skills, agents
+
+
+def check_isolation(arm: str, transcript: Path, user_home: Path | None = None) -> list[str]:
     """Problems with what the session loaded, from its init event; empty means isolated."""
     event = init_event(transcript)
     if event is None:
         return ["no init event in the transcript"]
+    user_skills, user_agents = user_config_names(user_home or Path.home())
+    problems = []
+    leaked = sorted(set(event.get("skills", [])) & user_skills)
+    leaked += sorted(set(event.get("agents", [])) & user_agents)
+    if leaked:
+        problems.append(f"user-level skills or agents loaded: {leaked}")
+    plugins = [p.get("name") for p in event.get("plugins", []) if p.get("path") != "builtin"]
+    if plugins:
+        problems.append(f"non-built-in plugins loaded: {plugins}")
+    memory = [m for m in (event.get("memory_paths") or {}).values() if "eval-home-" not in m]
+    if memory:
+        problems.append(f"memory outside the run's HOME: {memory}")
     servers = {s.get("name") for s in event.get("mcp_servers", [])}
     mcp_tools = [t for t in event.get("tools", []) if t.startswith("mcp__")]
-    problems = []
     if arm == "baseline":
         if servers or mcp_tools:
             problems.append(f"baseline loaded MCP servers {sorted(servers)} / tools {mcp_tools}")

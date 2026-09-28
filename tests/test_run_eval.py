@@ -102,3 +102,43 @@ def test_relative_claude_path_works(tmp_path, monkeypatch):
         + ["--claude", rel, "--runs-dir", str(tmp_path)]
     )
     assert code == 0
+
+
+REAL_INIT = json.loads((Path(__file__).parent / "init_event_2.1.283.json").read_text())
+
+
+def isolation(tmp_path, arm, event, user_home):
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text(json.dumps(event) + "\n")
+    return run_eval.check_isolation(arm, transcript, user_home)
+
+
+def fake_user_home(tmp_path):
+    home = tmp_path / "home"
+    (home / ".claude" / "skills" / "portfolio-review").mkdir(parents=True)
+    (home / ".claude" / "agents").mkdir()
+    (home / ".claude" / "agents" / "search.md").write_text("x")
+    return home
+
+
+def test_real_init_event_passes_both_arms(tmp_path):
+    home = fake_user_home(tmp_path)
+    baseline = {
+        **REAL_INIT,
+        "mcp_servers": [],
+        "tools": [t for t in REAL_INIT["tools"] if not t.startswith("mcp__")],
+    }  # noqa: E501
+    assert isolation(tmp_path, "primer", REAL_INIT, home) == []
+    assert isolation(tmp_path, "baseline", baseline, home) == []
+
+
+def test_user_skill_agent_plugin_or_memory_leaks_fail(tmp_path):
+    home = fake_user_home(tmp_path)
+    leaks = [
+        {"skills": REAL_INIT["skills"] + ["portfolio-review"]},
+        {"agents": REAL_INIT["agents"] + ["search"]},
+        {"plugins": REAL_INIT["plugins"] + [{"name": "mine", "path": "/home/me/plugin"}]},
+        {"memory_paths": {"auto": "/home/me/.claude/projects/x/memory/"}},
+    ]
+    for leak in leaks:
+        assert isolation(tmp_path, "primer", {**REAL_INIT, **leak}, home), leak

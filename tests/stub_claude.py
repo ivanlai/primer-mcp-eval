@@ -34,6 +34,10 @@ emit(
         "tools": tools,
         "mcp_servers": [{"name": n, "status": "connected"} for n in names],
         "home": os.environ["HOME"],
+        "skills": ["debug", "simplify"],
+        "agents": ["general-purpose", "Plan"],
+        "plugins": [{"name": "telemetry", "path": "builtin"}],
+        "memory_paths": {"auto": os.environ["HOME"] + "/.claude/projects/x/memory/"},
     }
 )
 Path("stub_note.txt").write_text(prompt)

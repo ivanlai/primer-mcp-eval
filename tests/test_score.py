@@ -143,3 +143,13 @@ def test_end_to_end_on_stub_runs(tmp_path):
     assert csv_text.count("\n") == 3  # header + one run per arm
     summary = (tmp_path / "pilot" / "summary.md").read_text()
     assert "## Rates by arm" in summary and "primer-mcp adoption" in summary
+
+
+def test_plan_agent_counts_as_planning(tmp_path):
+    calls = [
+        call("Task", subagent_type="Plan", prompt="plan it"),
+        call("Edit", file_path="src/a.py"),
+    ]
+    assert score.score_run(make_run(tmp_path, calls))["planned_first"] is True
+    other = [call("Task", subagent_type="Explore"), call("Edit", file_path="src/a.py")]
+    assert score.score_run(make_run(tmp_path / "b", other))["planned_first"] is False

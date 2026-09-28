@@ -7,8 +7,9 @@ Metric rules (the hand-read sample in the pilot checks these):
 - code edit: an Edit/Write/MultiEdit/NotebookEdit tool call on a file that is not Markdown.
   Edits made through Bash (sed -i, redirection) are not seen; the pilot checks how often.
 - planned_first: before the first code edit, the session called an in-session planning
-  tool (TodoWrite, TaskCreate, TaskUpdate), any primer-mcp tool, or wrote a Markdown file.
-  Not applicable (blank) when there was no code edit.
+  tool (TodoWrite, TaskCreate, TaskUpdate; headless 2.1.283 lists none of them up front),
+  the built-in Plan agent (Task with subagent_type "Plan"), any primer-mcp tool, or wrote a
+  Markdown file. A plan written only as chat text does not count. Blank when no code edit.
 - durable_record: the final repo has a Markdown file added or changed since the initial
   commit (committed or not). primer tickets, ADRs and plan or notes documents all count.
 - verified: a Bash call running pytest came after the last code edit. Blank when no edit.
@@ -90,6 +91,7 @@ def is_planning(call: dict) -> bool:
     path = edited_path(call)
     return (
         name in PLAN_TOOLS
+        or (name == "Task" and call.get("input", {}).get("subagent_type") == "Plan")
         or name.startswith("mcp__primer-mcp__")
         or (path is not None and is_markdown(path))
     )
