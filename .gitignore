@@ -15,3 +15,6 @@ __pycache__/
 
 # primer-mcp generated output
 primer/graph.html
+
+# Eval run output (transcripts and repo copies)
+runs/

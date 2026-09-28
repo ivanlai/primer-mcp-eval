@@ -1,0 +1,12 @@
+# Pinned settings for eval runs (ADR-002, ADR-005). Changing any value after the
+# headline runs start means rerunning both arms.
+
+[pins]
+claude_cli = "2.1.283"        # checked against `claude --version` before any run
+primer_mcp = "0.1.7"          # MCP server and init_project version for the primer arm
+model = "claude-sonnet-5"     # model every run uses
+
+[limits]
+budget_usd = 2.0              # --max-budget-usd per run
+timeout_s = 1800              # wall-clock limit per run
+permission_mode = "bypassPermissions"  # unattended runs cannot answer permission prompts
