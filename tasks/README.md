@@ -37,3 +37,5 @@ uv run pytest -p no:cacheprovider --confcutdir=<repo>/tasks <repo>/tasks/<task-i
 `--confcutdir` is needed so pytest loads `tasks/conftest.py`, which sits outside the fixture copy's rootdir.
 
 A task is valid when its check fails on the fixture as shipped, and when, with `reference.patch` applied, both the check and the fixture's own suite pass.
+
+Validate every task (or name task ids) with `python3 scripts/validate_tasks.py`. It exports the fixture from git HEAD, so commit fixture changes first.
