@@ -1,0 +1,17 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[codz]
+
+# Virtual environments
+.venv
+
+# Environment variables (API keys)
+.env
+
+# Testing / type checking / linting
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# primer-mcp generated output
+primer/graph.html
