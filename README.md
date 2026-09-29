@@ -64,7 +64,7 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 | Out-of-scope files (mean) | 0 | 0 |
 | Mean turns / time / est. cost | 19 / 66s / $0.29 | 30 / 101s / $0.44 |
 
-95% intervals in brackets, bootstrapped over scenarios. Cost is Claude Code's own API-equivalent estimate; the runs used a subscription, and the whole batch came to an estimated $26.
+The two planning metrics coincide because every primer-arm plan was a ticket. 95% intervals in brackets, bootstrapped over scenarios. Cost is Claude Code's own API-equivalent estimate; the runs used a subscription, and the whole batch came to an estimated $26.
 
 **By kind of change** (3 runs per scenario per arm):
 
@@ -77,7 +77,7 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 | Trivial (2) | 0/6 → 3/6 | 6/6 → 6/6 | $0.15 → $0.29 |
 
 **What the runs show.**
-- On every feature and ambiguous run, the primer-mcp agent created tickets before editing code and left them in the repo; the baseline never wrote a plan down. On bug fixes and refactors the two arms behaved almost identically, in both behaviour and cost.
+- On every feature and ambiguous run, the primer-mcp agent created tickets before editing code and left them in the repo; the baseline never wrote a plan down. On bug fixes and refactors the two arms behaved similarly.
 - In the one trivial scenario where it planned ("show a count per category"), each run set up the generic epic and standing small-fixes story that later small changes would go under ("Bug fixes & small improvements" and similar), then one task. Every run starts from an empty `primer/` folder, so every run paid this one-off setup, which more than doubled the cost of that scenario. In ongoing use it is paid once. The other trivial scenario (renaming a label) never used the tools.
 - Of the 36 primer-arm runs, 21 called primer-mcp at all, averaging 2.25 tickets each, and 18 used both `complete_task` and `verify_task`.
 - Functional failures, hand-checked: two baseline and one primer run on budgets left out the budget amount the prompt asked for; one baseline CSV import reported only the first bad line, not each one. The fourth baseline failure (ambiguous request) is a false negative in the check: the agent added a month-over-month line and fixed a real bug, but the check's data has only one month, so the default output looked unchanged. Scored as in the pre-set rules, but it means the functional gap is 2–3 runs, well inside the intervals.
@@ -87,20 +87,27 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 
 ## Verdict
 
-primer-mcp changes how the agent works on the kind of work it is aimed at. On features and open-ended requests, adding it took planning-before-coding and a written record from never to every time, in 15 of 15 runs against 0 of 15. On bug fixes and refactors it made almost no difference, though that may change once a standing bug-fix story exists (see Limits). That makes the overall 53% an average of "always" and "rarely", not a coin flip.
+primer-mcp changes how the agent works on larger changes. On features and open-ended requests, adding it took planning-before-coding and a written record from never to every time, in 15 of 15 runs against 0 of 15. On bug fixes and refactors it made almost no difference, though that may change once a standing bug-fix story exists (see Limits). That makes the overall 53% an average of "always" and "rarely", not a coin flip. What primer-mcp reliably adds is a written plan and record; whether that record pays for its cost over later sessions is the open question (see Limits).
 
 It did not measurably change outcomes. Both arms verified every time, stayed in scope and kept the repo's tests passing. primer-mcp had slightly more functional passes, but the difference is within noise at this size.
 
 The cost is about 50% more turns, time and estimated spend overall, concentrated where it plans (+60% on features). These figures likely overstate the ongoing cost: every run that planned created its own epic, and the small-fix runs also set up the standing bug-fix story, because each run started with no tickets. In a project that already has its epics, that setup is paid once, not per change.
 
-**Limits.** One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above. Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them. Whether to plan a small change is left to the agent's judgement, so the bug-fix and trivial results in particular may differ with another model. The eval models adopting primer-mcp on an app that already exists, with an empty `primer/` folder. In the intended use, from a project's start, epics and a standing bug-fix story would usually exist already. That affects both the setup cost above and whether the agent tracks small fixes, which this design cannot show. Each run is also a single session, and nothing reads the tickets and decision records afterwards, so the eval measures what writing the record costs, not whether it pays off in later sessions.
+**Limits.**
+- One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario.
+- The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above.
+- Whether to plan a small change is left to the agent's judgement, so the bug-fix and trivial results in particular may differ with another model.
+- Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them.
+- The eval models adopting primer-mcp on an app that already exists, with an empty `primer/` folder. In the intended use, from a project's start, epics and a standing bug-fix story would usually exist already. That affects both the setup cost above and whether the agent tracks small fixes, which this design cannot show.
+- Each run is a single session, and nothing reads the tickets and decision records afterwards, so the eval measures what writing the record costs, not whether it pays off in later sessions.
 
 ## Reproducing
 
 ```
-python3 scripts/validate_scenarios.py                       # scenarios are well formed
-python3 scripts/run_eval.py --batch pilot --dry-run         # what each run would do
-python3 scripts/run_eval.py --batch headline --reps 3       # real runs (see scripts/README.md for auth)
-python3 scripts/score.py --batch headline                   # results/headline/summary.md
-uv run --with pytest --no-project pytest tests              # offline tests of the scripts
+python3 scripts/validate_scenarios.py                                   # scenarios are well formed
+python3 scripts/run_eval.py --batch pilot --dry-run                     # what each run would do
+python3 scripts/run_eval.py --batch headline --reps 3 --wait-on-limit   # real runs; waits out usage limits (see scripts/README.md for auth)
+python3 scripts/run_eval.py --batch headline --reps 3 --redo-failed     # rerun infrastructure failures
+python3 scripts/score.py --batch headline                               # results/headline/summary.md
+uv run --with pytest --no-project pytest tests                          # offline tests of the scripts
 ```
