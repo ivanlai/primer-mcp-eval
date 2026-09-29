@@ -78,7 +78,7 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 
 **What the runs show.**
 - On every feature and ambiguous run, the primer-mcp agent created tickets before editing code and left them in the repo; the baseline never wrote a plan down. On bug fixes and refactors the two arms behaved almost identically, in both behaviour and cost.
-- The one trivial scenario where it planned ("show a count per category") got a full epic, story and task in all three runs, which more than doubled its cost for a one-line change. The other trivial scenario (renaming a label) never used the tools.
+- In the one trivial scenario where it planned ("show a count per category"), each run set up the generic epic and standing small-fixes story that later small changes would go under ("Bug fixes & small improvements" and similar), then one task. Every run starts from an empty `primer/` folder, so every run paid this one-off setup, which more than doubled the cost of that scenario. In ongoing use it is paid once. The other trivial scenario (renaming a label) never used the tools.
 - Of the 36 primer-arm runs, 21 called primer-mcp at all, averaging 2.25 tickets each, and 18 used both `complete_task` and `verify_task`.
 - Functional failures, hand-checked: two baseline and one primer run on budgets left out the budget amount the prompt asked for; one baseline CSV import reported only the first bad line, not each one. The fourth baseline failure (ambiguous request) is a false negative in the check: the agent added a month-over-month line and fixed a real bug, but the check's data has only one month, so the default output looked unchanged. Scored as in the pre-set rules, but it means the functional gap is 2–3 runs, well inside the intervals.
 - The pilot's one stall (the agent stopped to ask for ticket approval despite being told no one would answer) did not recur in 36 primer runs.
@@ -91,9 +91,9 @@ primer-mcp changes how the agent works on the kind of work it is aimed at. On fe
 
 It did not measurably change outcomes. Both arms verified every time, stayed in scope and kept the repo's tests passing. primer-mcp had slightly more functional passes, but the difference is within noise at this size.
 
-The cost is about 50% more turns, time and estimated spend overall, concentrated where it plans (+60% on features). It also over-plans some trivial changes: a full ticket hierarchy for a one-line edit.
+The cost is about 50% more turns, time and estimated spend overall, concentrated where it plans (+60% on features), plus a one-off cost to set up the standing structure for small fixes, which this design charges on every run.
 
-**Limits.** One model, one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above. Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present.
+**Limits.** One model, one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above. Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them. Every run also started from an empty `primer/` folder, so the results don't show how the agent handles small fixes once a standing structure exists.
 
 ## Reproducing
 
