@@ -102,7 +102,7 @@ primer-mcp changes how the agent works on larger pieces of work. On features and
 
 It did not measurably change outcomes. Both arms verified every time, stayed in scope and kept the repo's tests passing. primer-mcp had slightly more functional passes, but the difference is within noise at this size.
 
-The cost is about 50% more turns, time and spend, mostly on features (+60%). This likely overstates it in practice: each run started with no tickets, so every plan included setting up an epic, which an ongoing project does once. The overhead was also about 20 extra turns whether the change was trivial or a feature, so it should be a smaller share of larger work (untested here).
+The cost is about 50% more turns, time and spend, mostly on features (+60%). This likely overstates it in practice: each run started with no tickets, so every plan included setting up an epic, which an ongoing project does once. Wherever the agent planned, the overhead was about 15–25 extra turns, from a trivial change to a feature. It grows with the number of tickets created (about 2–3 primer-mcp calls per ticket) rather than with the size of the code change, so it should be a smaller share of larger work (untested here).
 
 **Limits.**
 - One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario.
