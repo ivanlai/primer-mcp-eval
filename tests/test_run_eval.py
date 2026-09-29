@@ -148,7 +148,7 @@ def test_redo_failed_reruns_only_failed_runs(tmp_path):
     run(tmp_path, "--arm", "baseline")
     meta_file = tmp_path / "pilot" / SCENARIO / "baseline" / "r1" / "meta.json"
     meta = json.loads(meta_file.read_text())
-    meta["exit_code"] = 1
+    meta["exit_code"], meta["run_failed"] = 1, True
     meta_file.write_text(json.dumps(meta))
     run(tmp_path, "--arm", "baseline")  # without the flag: skipped, still failed
     assert json.loads(meta_file.read_text())["exit_code"] == 1
@@ -194,3 +194,51 @@ def test_eval_repo_cwd_or_path_in_transcript_fails(tmp_path):
     transcript.write_text(json.dumps(REAL_INIT) + "\n" + json.dumps(grep) + "\n")
     problems = run_eval.check_isolation("primer", transcript, home)
     assert any("referenced the eval repo" in p for p in problems)
+
+
+def flaky_claude(tmp_path, failures):
+    """A stub that fails like a usage limit for its first `failures` calls, then works."""
+    count = tmp_path / "calls"
+    script = tmp_path / "flaky_claude"
+    script.write_text(
+        "#!/bin/sh\n"
+        f"n=$(cat {count} 2>/dev/null || echo 0); echo $((n+1)) > {count}\n"
+        f'if [ "$n" -lt {failures} ]; then\n'
+        '  echo \'{"type":"system","subtype":"init","tools":[],"mcp_servers":[]}\'\n'
+        '  echo \'{"type":"assistant","error":"rate_limit","message":{"content":[]}}\'\n'
+        '  echo \'{"type":"result","is_error":true,"result":"Usage limit reached"}\'\n'
+        "  exit 1\nfi\n"
+        f'exec {STUB} "$@"\n'
+    )
+    script.chmod(0o755)
+    return str(script)
+
+
+def run_waiting(tmp_path, claude, monkeypatch):
+    slept = []
+    monkeypatch.setattr(run_eval, "SLEEP", slept.append)
+    code = run_eval.main(
+        ["--batch", "pilot", "--scenario", SCENARIO, "--arm", "baseline", "--wait-on-limit"]
+        + ["--claude", claude, "--runs-dir", str(tmp_path / "runs")]
+    )
+    return code, slept
+
+
+def test_wait_on_limit_retries_until_the_run_succeeds(tmp_path, monkeypatch):
+    code, slept = run_waiting(tmp_path, flaky_claude(tmp_path, 2), monkeypatch)
+    assert code == 0 and slept == [900, 1800]
+    meta = tmp_path / "runs" / "pilot" / SCENARIO / "baseline" / "r1" / "meta.json"
+    assert json.loads(meta.read_text())["run_failed"] is False
+
+
+def test_wait_on_limit_gives_up_after_the_retry_cap(tmp_path, monkeypatch):
+    code, slept = run_waiting(tmp_path, flaky_claude(tmp_path, 99), monkeypatch)
+    assert code == 1 and slept == list(run_eval.RETRY_WAITS_S)
+
+
+def test_zero_exit_with_an_error_result_counts_as_failed(tmp_path):
+    transcript = tmp_path / "t.jsonl"
+    transcript.write_text('{"type":"result","is_error":true,"result":"Usage limit reached"}\n')
+    assert run_eval.run_failed(0, transcript) is True
+    transcript.write_text('{"type":"result","is_error":false,"result":"Done."}\n')
+    assert run_eval.run_failed(0, transcript) is False
