@@ -87,13 +87,13 @@ primer-mcp-specific numbers (tickets created, `complete_task` and `verify_task` 
 
 ## Verdict
 
-primer-mcp changes how the agent works on the kind of work it is aimed at. On features and open-ended requests, adding it took planning-before-coding and a written record from never to every time, in 15 of 15 runs against 0 of 15. On bug fixes and refactors it made almost no difference. That makes the overall 53% an average of "always" and "rarely", not a coin flip.
+primer-mcp changes how the agent works on the kind of work it is aimed at. On features and open-ended requests, adding it took planning-before-coding and a written record from never to every time, in 15 of 15 runs against 0 of 15. On bug fixes and refactors it made almost no difference, though that may change once a standing bug-fix story exists (see Limits). That makes the overall 53% an average of "always" and "rarely", not a coin flip.
 
 It did not measurably change outcomes. Both arms verified every time, stayed in scope and kept the repo's tests passing. primer-mcp had slightly more functional passes, but the difference is within noise at this size.
 
-The cost is about 50% more turns, time and estimated spend overall, concentrated where it plans (+60% on features), plus a one-off cost to set up the standing structure for small fixes, which this design charges on every run.
+The cost is about 50% more turns, time and estimated spend overall, concentrated where it plans (+60% on features). These figures likely overstate the ongoing cost: every run that planned created its own epic, and the small-fix runs also set up the standing bug-fix story, because each run started with no tickets. In a project that already has its epics, that setup is paid once, not per change.
 
-**Limits.** One model, one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above. Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them. Every run also started from an empty `primer/` folder, so the results don't show how the agent handles small fixes once a standing structure exists.
+**Limits.** One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. The planning metrics show that planning happened and was written down, not that it was good. The functional checks are narrow; one false negative is noted above. Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them. Whether to plan a small change is left to the agent's judgement, so the bug-fix and trivial results in particular may differ with another model. The eval models adopting primer-mcp on an app that already exists, with an empty `primer/` folder. In the intended use, from a project's start, epics and a standing bug-fix story would usually exist already. That affects both the setup cost above and whether the agent tracks small fixes, which this design cannot show.
 
 ## Reproducing
 
