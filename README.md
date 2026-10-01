@@ -134,9 +134,7 @@ But that case comes from teams of people working over months, and from records t
 
 None of the setups changed whether the work was done correctly.
 
-primer-mcp's extra cost (about 50%) is mostly ticket writing, roughly 2–3 tool calls per ticket.
-- It grows with the number of tickets, not the size of the change, so it should matter less on larger work.
-- It's overstated here, because every run started with no tickets and had to set up an epic first.
+primer-mcp's extra cost (about 50%) is mostly ticket writing, roughly 2–3 tool calls per ticket. It grows with the number of tickets, not the size of the change, so it should matter less on larger work.
 
 **Limits.**
 - One model, one Claude Code version, one small, clean app, 3 runs per request. How closely an agent follows a one-line instruction depends on the model.
