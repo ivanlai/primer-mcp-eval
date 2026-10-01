@@ -1,24 +1,41 @@
 # Results: headline
 
-72 runs.
+108 runs.
 
 ## Rates by arm
 
-| Metric | baseline | primer |
-|---|---|---|
-| planned_first | 0% (0%–0%) | 53% (25%–78%) |
-| durable_record | 0% (0%–0%) | 53% (25%–78%) |
-| verified | 100% (100%–100%) | 100% (100%–100%) |
-| functional | 89% (75%–100%) | 97% (92%–100%) |
-| repo_tests | 100% (100%–100%) | 100% (100%–100%) |
-| asked | 0% (0%–0%) | 0% (0%–0%) |
-| out-of-scope files (mean) | 0.00 | 0.00 |
-| cost $ (mean) | 0.29 | 0.44 |
-| turns (mean) | 18.94 | 29.78 |
-| duration s (mean) | 66.12 | 101.09 |
+| Metric | baseline | instructions | primer |
+|---|---|---|---|
+| planned_first | 0% (0%–0%) | 0% (0%–0%) | 53% (25%–78%) |
+| durable_record | 0% (0%–0%) | 0% (0%–0%) | 53% (25%–78%) |
+| verified | 100% (100%–100%) | 97% (91%–100%) | 100% (100%–100%) |
+| functional | 89% (75%–100%) | 86% (72%–97%) | 97% (92%–100%) |
+| repo_tests | 100% (100%–100%) | 100% (100%–100%) | 100% (100%–100%) |
+| asked | 0% (0%–0%) | 6% (0%–14%) | 0% (0%–0%) |
+| out-of-scope files (mean) | 0.00 | 0.00 | 0.00 |
+| cost $ (mean) | 0.29 | 0.28 | 0.44 |
+| turns (mean) | 18.94 | 17.64 | 29.78 |
+| duration s (mean) | 66.12 | 70.34 | 101.09 |
 
 Rates exclude runs where the metric doesn't apply. Intervals are 95%,
 bootstrapped over scenarios.
+
+## Per-scenario difference (instructions − baseline)
+
+| Scenario | planned_first | durable_record | verified | functional |
+|---|---|---|---|---|
+| ambiguous-summary | +0% | +0% | +0% | +0% |
+| bug-category-filter-case | +0% | +0% | +0% | -33% |
+| bug-float-amounts | +0% | +0% | +0% | +0% |
+| bug-month-ignores-year | +0% | +0% | +0% | +0% |
+| feature-budgets | +0% | +0% | +0% | +0% |
+| feature-csv | +0% | +0% | +0% | +0% |
+| feature-edit-delete | +0% | +0% | +0% | +0% |
+| feature-recurring | +0% | +0% | +0% | +0% |
+| refactor-render-summary | +0% | +0% | -33% | +0% |
+| refactor-serialisation | +0% | +0% | +0% | +0% |
+| trivial-average-label | +0% | +0% | +0% | +0% |
+| trivial-category-counts | +0% | +0% | +0% | +0% |
 
 ## Per-scenario difference (primer − baseline)
 

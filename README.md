@@ -6,6 +6,7 @@ Does [primer-mcp](https://github.com/ivanlai/primer-mcp) change how AI coding ag
 - **Question:** does primer-mcp, a planning-first MCP server, change how an AI coding agent works?
 - **Design:** 12 change requests on an app written for the eval, given to headless Claude Code with and without primer-mcp, 3 times each: 72 isolated runs at pinned versions, scored deterministically from transcripts with no LLM judge.
 - **Result:** on features and open-ended requests, primer-mcp took a written plan before coding from 0 of 15 runs to 15 of 15. On bug fixes and refactors it changed little. Outcomes (functional checks, tests, scope) showed no measurable difference. It cost about 50% more, partly one-off setup.
+- **Follow-up:** a third arm with only "Plan first." in CLAUDE.md made the agent state a plan in chat before coding in 35 of 36 runs, at no extra cost, but it never wrote one down. What primer-mcp adds over that one line is the written record, not the planning.
 - **Open question:** whether the written record pays off in later sessions, which this single-session design cannot show.
 
 ## Purpose
@@ -30,11 +31,12 @@ The design is recorded as decision records in [`primer/adrs/`](primer/adrs/). Th
 | Trivial | 2 | rename a label; show a count per category |
 | Ambiguous | 1 | "Make `expenses summary` more useful." |
 
-Prompts never mention primer-mcp, tickets or planning, and both arms get identical prompts. Each prompt ends with one line saying no one is available to answer questions. Each scenario has a functional check, which asserts only what the prompt asks for, and a reference solution that proves the check can be passed. `scripts/validate_scenarios.py` confirms mechanically that every check fails on the app as shipped and passes with its reference.
+Prompts never mention primer-mcp, tickets or planning, and every arm gets identical prompts. Each prompt ends with one line saying no one is available to answer questions. Each scenario has a functional check, which asserts only what the prompt asks for, and a reference solution that proves the check can be passed. `scripts/validate_scenarios.py` confirms mechanically that every check fails on the app as shipped and passes with its reference.
 
-**Two arms** (ADR-003):
+**Arms** (ADR-003, ADR-006):
 - *Baseline:* plain Claude Code with no MCP servers and no CLAUDE.md.
 - *Primer:* the same, plus primer-mcp at a pinned version, with `init_project` already run (the `primer/` folder and its CLAUDE.md section are in place).
+- *Instructions* (a follow-up, ADR-006): the baseline plus a CLAUDE.md that says only "Plan first." It tests the obvious objection: couldn't one line of instructions do what primer-mcp does?
 
 **Harness** (ADR-002). Every run is a separate headless Claude Code session (`claude -p`) at a pinned CLI version, model and primer-mcp version (`eval.toml`). Each run starts from a fresh git repo of the app, in a temporary folder outside this repo, with an empty `HOME`. No user-level instructions, memory, skills, hooks or MCP servers can reach it. An isolation check reads each session's start-up event and fails any run that loaded something it shouldn't, or that looked outside its own repo.
 
@@ -94,18 +96,40 @@ The two planning metrics coincide because every primer-arm plan was a ticket. 95
   While primer-mcp looks like a slight improvement, the gap (2 or 3 runs, depending on how the ambiguous case is counted) is too small to rule out statistical noise with a sample this size.
 - The pilot's one stall (the agent stopped to ask for ticket approval despite being told no one would answer) did not recur in 36 primer runs.
 
+**Follow-up: "Plan first." only** (36 runs, 12 scenarios × 3, run two days after the headline at the same pins, an estimated $10; every run passed the isolation check). Scored with the same frozen rules and compared with the headline runs above; the summary file now shows all three arms.
+
+| Metric | Baseline | Instructions | primer-mcp |
+|---|---|---|---|
+| Wrote a plan before first code edit | 0% | 0% | 53% |
+| Stated a plan in chat before first code edit | 0/36 | 35/36 | – |
+| Left a durable record | 0% | 0% | 53% |
+| Verified before finishing | 100% | 97% | 100% |
+| Functional pass | 89% | 86% | 97% |
+| Stopped to ask | 0% | 6% (2 runs) | 0% |
+| Mean turns / time / est. cost | 19 / 66s / $0.29 | 18 / 70s / $0.28 | 30 / 101s / $0.44 |
+
+The chat-plan row is not a scored metric (ADR-006 kept scoring deterministic): it comes from searching each run's messages before its first code edit for a stated plan, then reading the instructions-arm runs the search didn't match. In the baseline, no run used the word "plan" or listed numbered steps before editing. Planning written only in chat leaves nothing behind once the session ends, so it scores 0 on the written-plan and record metrics. primer-mcp's plans went into tickets, so that row doesn't apply to it.
+
+- **The line works, in chat.** 35 of 36 runs set out a plan before touching code, usually a "Plan" heading with numbered steps, and several cited the instruction ("per CLAUDE.md's 'Plan first' instruction"). The other gave a one-sentence intent. Unlike primer-mcp, it planned on bug fixes and refactors too. None wrote the plan to a file, and none committed (the baseline didn't commit either; 10 of 36 primer runs did).
+- **It costs nothing.** Turns, time and cost match the baseline. A chat plan is a few lines of output, where primer-mcp's tickets took about 15–25 extra turns.
+- **It sometimes stalls.** In 2 runs (a bug fix and the CSV feature) the agent wrote its plan and then asked "Shall I proceed?", despite being told no one would answer, so nothing was built. That's the same failure the pilot saw once with primer-mcp, and it accounts for 2 of the 5 functional failures. The other 3 match the baseline's: the budget amount missing from the summary (2), and the ambiguous request's flawed check (1).
+- One refactor run checked its output by running the CLI by hand instead of the tests, so it scores as unverified.
+
 **Pilot** (24 runs, used to test the pipeline and scoring; not part of the headline): [`results/pilot/summary.md`](results/pilot/summary.md). It showed the same pattern.
 
 ## Verdict
 
 primer-mcp changes how the agent works on larger pieces of work. On features and open-ended requests, adding it took planning-before-coding and a written record from never to every time, in 15 of 15 runs against 0 of 15. On bug fixes and refactors it made almost no difference, though that may change once a standing bug-fix story exists. What primer-mcp reliably adds is a written plan and record; whether that record pays for its cost over later sessions is the open question (see Limits).
 
+**The "one line in CLAUDE.md" objection.** On this model, a single "Plan first." line gets the agent to plan before coding almost every time, at no cost, including on the small changes where primer-mcp mostly didn't plan. So primer-mcp's tools aren't needed to make the agent plan. What they add is the record: the plan written to the repo as linked tickets, decisions and verification notes, which outlives the session. That puts primer-mcp's value on whether a later session uses that record, which is the open question below.
+
 It did not measurably change outcomes. Both arms verified every time, stayed in scope and kept the repo's tests passing. primer-mcp had slightly more functional passes, but the difference is within noise at this size.
 
 The cost is about 50% more turns, time and spend, mostly on features (+60%). This likely overstates it in practice: each run started with no tickets, so every plan included setting up an epic, which an ongoing project does once. Wherever the agent planned, the overhead was about 15–25 extra turns, from a trivial change to a feature. It grows with the number of tickets created (about 2–3 primer-mcp calls per ticket) rather than with the size of the code change, so it should be a smaller share of larger work (untested here).
 
 **Limits.**
-- One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario.
+- One model (`claude-sonnet-5`), one CLI version, one small clean codebase written for the eval. Three repetitions per scenario. How far an instruction alone goes depends on the model.
+- The instructions arm ran two days after the other two, at the same pinned CLI version and model name; the model served behind that name could still have changed.
 - The planning metrics show that planning happened and was written down, not that it was necessarily good. The functional checks are narrow; one false negative is noted above.
 - Whether to plan a small change is left to the agent's judgement, so the bug-fix and trivial results in particular may differ with another model.
 - Every run was told no one would answer questions, so this says nothing about how primer-mcp's nudges to propose tickets play out with a user present, who can decline them.
@@ -115,7 +139,7 @@ The cost is about 50% more turns, time and spend, mostly on features (+60%). Thi
 ## Next experiments
 
 Each follows from a limit above.
-- **Does the record pay off?** Two sessions per scenario: the first makes a change and records a decision; the second, starting fresh, gets a request that touches that decision. Measure whether the decision is respected, how many turns the agent spends working out context, and whether the result is correct.
+- **Does the record pay off?** Two sessions per scenario: the first makes a change and records a decision; the second, starting fresh, gets a request that touches that decision. Measure whether the decision is respected, how many turns the agent spends working out context, and whether the result is correct. Since "Plan first." already gets the planning, compare primer-mcp with "Plan first." plus commits, so git history is the record to beat.
 - **An established project.** Start the primer arm from a `primer/` folder that already has epics and a standing bug-fix story. That measures the ongoing cost rather than first use, and whether small fixes get tracked once there is somewhere to put them.
 - **Another model.** A pilot-sized run (one per scenario per arm) with a more capable model, looking mostly at the bug-fix and trivial scenarios, where planning is a judgement call.
 
@@ -123,7 +147,7 @@ Each follows from a limit above.
 
 Problems solved along the way, recorded in the tickets under [`primer/tasks/`](primer/tasks/):
 - **Isolation.** Each run must see only its own copy of the app. It runs in a fresh git repo under `/tmp`, with an empty `HOME`, a minimal environment and only its arm's MCP servers. This was learned the hard way: the first real run was inside this repo, where an agent could search parent folders for the reference solutions, and Claude Code picked up this repo's `CLAUDE.md`. That run was redone, and an automatic check now fails any run that loads something it shouldn't or touches this repo.
-- **Pinning.** Claude Code auto-updated mid-day while the pilot was being set up, so the runner calls the pinned binary directly with the updater off, and every run records its versions.
+- **Pinning.** Claude Code auto-updated mid-day while the pilot was being set up, so the runner calls the pinned binary directly with the updater off, and every run records its versions. By the follow-up the pinned version was no longer installed; it was reinstalled from Anthropic's release server, checked against the release's SHA-256, so the new arm could be compared with the existing runs instead of rerunning them.
 - **Checks that can be trusted.** `validate_scenarios.py` confirms that every functional check fails on the app as shipped and passes with the reference solution.
 - **Deterministic scoring, frozen before the headline.** No model judges the runs; Claude Code was used only to inspect transcripts and explain failures. Inspecting the pilot's transcripts found three scoring flaws (an unstated trap in one check, false scope violations, and read-only primer-mcp calls counted as planning), all fixed before the headline. The rules were then frozen, which is why the headline's one false negative is disclosed rather than rescored.
 - **Statistics.** The 95% intervals come from resampling whole scenarios many times (a bootstrap). Runs of the same scenario behave alike, so the real sample is 12 scenarios, not 36 runs, and the intervals reflect that.
