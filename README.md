@@ -30,7 +30,7 @@ An MCP server that gives a coding agent ticket tools (epics, decisions, stories,
 The claim is that the agent:
 - plans first,
 - leaves a written record,
-- involves the user before coding, by proposing tickets they can approve, edit or decline,
+- engages the user before coding, by proposing tickets they can approve, edit or decline,
 - verifies its work, and
 - stays in scope.
 
