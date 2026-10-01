@@ -26,9 +26,9 @@ def test_compose_prompt_appends_autonomy_line():
     assert prompt == f"{request}\n\n{autonomy}\n"
 
 
-def test_both_arms_produce_full_layout(tmp_path):
+def test_every_arm_produces_full_layout(tmp_path):
     assert run(tmp_path) == 0
-    for arm in ("baseline", "primer"):
+    for arm in run_eval.ARMS:
         d = tmp_path / "pilot" / SCENARIO / arm / "r1"
         for name in ("prompt.txt", "command.json", "transcript.jsonl", "stderr.txt", "meta.json"):
             assert (d / name).is_file(), (arm, name)
@@ -50,6 +50,16 @@ def test_primer_arm_is_initialised_and_baseline_is_not(tmp_path):
     assert "primer-mcp" in (primer / "CLAUDE.md").read_text()
     tracked = subprocess.run(["git", "ls-files"], cwd=primer, capture_output=True, text=True)
     assert "CLAUDE.md" in tracked.stdout.split()
+
+
+def test_instructions_arm_has_only_a_plan_first_claude_md(tmp_path):
+    run(tmp_path, "--arm", "instructions")
+    d = tmp_path / "pilot" / SCENARIO / "instructions" / "r1"
+    assert (d / "repo" / "CLAUDE.md").read_text() == "Plan first.\n"
+    assert not (d / "repo" / "primer").exists() and not (d / "repo" / "AGENTS.md").exists()
+    tracked = subprocess.run(["git", "ls-files"], cwd=d / "repo", capture_output=True, text=True)
+    assert "CLAUDE.md" in tracked.stdout.split()
+    assert json.loads((d / "command.json").read_text())["mcp"] == {"mcpServers": {}}
 
 
 def test_session_gets_an_empty_home(tmp_path):
@@ -88,7 +98,7 @@ def test_dry_run_writes_nothing(tmp_path, capsys):
     assert not (tmp_path / "pilot").exists()
 
 
-@pytest.mark.parametrize("arm", ["baseline", "primer"])
+@pytest.mark.parametrize("arm", run_eval.ARMS)
 def test_mcp_config_per_arm(arm):
     servers = run_eval.mcp_config(arm, "0.1.7", "uvx")["mcpServers"]
     assert (arm == "primer") == ("primer-mcp" in servers)
@@ -130,6 +140,12 @@ def test_real_init_event_passes_both_arms(tmp_path):
     }  # noqa: E501
     assert isolation(tmp_path, "primer", REAL_INIT, home) == []
     assert isolation(tmp_path, "baseline", baseline, home) == []
+    assert isolation(tmp_path, "instructions", baseline, home) == []
+
+
+def test_instructions_arm_with_primer_mcp_fails_isolation(tmp_path):
+    problems = isolation(tmp_path, "instructions", REAL_INIT, fake_user_home(tmp_path))
+    assert any("instructions loaded MCP servers" in p for p in problems)
 
 
 def test_user_skill_agent_plugin_or_memory_leaks_fail(tmp_path):

@@ -3,14 +3,15 @@
 Each run gets a fresh git repo of the fixture, a throwaway HOME (so no user-level
 CLAUDE.md, memory, hooks, git config or MCP servers reach it), pinned versions from
 eval.toml, and --strict-mcp-config. The primer arm has init_project applied before
-the initial commit; the baseline arm has no MCP servers at all.
+the initial commit; the baseline arm has no MCP servers at all; the instructions arm
+(ADR-006) is the baseline plus a CLAUDE.md that says only "Plan first."
 
 Output, per run: runs/<batch>/<scenario>/<arm>/r<n>/ with prompt.txt, command.json,
 transcript.jsonl, stderr.txt, meta.json and repo/ (the final working copy). A run
 whose meta.json exists is skipped, so an interrupted batch can be resumed.
 
 Usage:
-  python3 scripts/run_eval.py --batch pilot [--scenario ID ...] [--arm baseline|primer ...]
+  python3 scripts/run_eval.py --batch pilot [--scenario ID ...] [--arm baseline|primer|instructions ...]
                               [--reps N] [--dry-run] [--claude PATH]
 
 Real runs need credentials passed in explicitly, because the isolated HOME has no stored
@@ -39,7 +40,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SCENARIOS = ROOT / "scenarios"
 RUNS = ROOT / "runs"
 FIXTURE = "fixtures/app"
-ARMS = ("baseline", "primer")
+ARMS = ("baseline", "primer", "instructions")
+INSTRUCTIONS = "Plan first.\n"  # the instructions arm's whole CLAUDE.md
 BATCHES = ("pilot", "headline")
 PROJECT_NAME = "expenses"
 RETRY_WAITS_S = (900, 1800, 3600, 3600)  # per failed run, then give up on the batch
@@ -60,7 +62,7 @@ def compose_prompt(scenario: str) -> str:
 
 
 def mcp_config(arm: str, primer_version: str, uvx: str) -> dict:
-    if arm == "baseline":
+    if arm != "primer":
         return {"mcpServers": {}}
     return {
         "mcpServers": {
@@ -95,6 +97,8 @@ def prepare_repo(repo: Path, arm: str, primer_version: str) -> None:
             check=True,
             capture_output=True,
         )
+    elif arm == "instructions":
+        (repo / "CLAUDE.md").write_text(INSTRUCTIONS)
     git(repo, "init", "-q", "-b", "main")
     git(repo, "config", "user.name", "Developer")
     git(repo, "config", "user.email", "developer@example.com")
@@ -202,14 +206,13 @@ def check_isolation(arm: str, transcript: Path, user_home: Path | None = None) -
         problems.append("the session referenced the eval repo's path")
     servers = {s.get("name") for s in event.get("mcp_servers", [])}
     mcp_tools = [t for t in event.get("tools", []) if t.startswith("mcp__")]
-    if arm == "baseline":
-        if servers or mcp_tools:
-            problems.append(f"baseline loaded MCP servers {sorted(servers)} / tools {mcp_tools}")
-    else:
+    if arm == "primer":
         if servers != {"primer-mcp"}:
             problems.append(f"primer arm expected only primer-mcp, got {sorted(servers)}")
         if not any(t.startswith("mcp__primer-mcp__") for t in mcp_tools):
             problems.append("primer arm has no primer-mcp tools")
+    elif servers or mcp_tools:
+        problems.append(f"{arm} loaded MCP servers {sorted(servers)} / tools {mcp_tools}")
     return problems
 
 
@@ -290,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run eval scenarios headless.")
     parser.add_argument("--batch", choices=BATCHES, required=True)
     parser.add_argument("--scenario", action="append", help="scenario id (default: all)")
-    parser.add_argument("--arm", action="append", choices=ARMS, help="arm (default: both)")
+    parser.add_argument("--arm", action="append", choices=ARMS, help="arm (default: all)")
     parser.add_argument("--reps", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true", help="print, don't run")
     parser.add_argument("--redo-failed", action="store_true", help="rerun failed runs")
