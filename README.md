@@ -30,6 +30,7 @@ An MCP server that gives a coding agent ticket tools (epics, decisions, stories,
 The claim is that the agent:
 - plans first,
 - leaves a written record,
+- involves the user before coding, by proposing tickets they can approve, edit or decline,
 - verifies its work, and
 - stays in scope.
 
@@ -140,7 +141,7 @@ primer-mcp's extra cost (about 50%) is mostly ticket writing, roughly 2–3 tool
 - One model, one Claude Code version, one small, clean app, 3 runs per request. How closely an agent follows a one-line instruction depends on the model.
 - The three setups didn't all run on the same days. Versions and the model name were fixed, but the model behind that name could have changed.
 - The scores show that a plan was written, not that it was good. The comparison of plan files and tickets above comes from a keyword search checked by reading, not from the scoring.
-- No one was there to answer questions, so this says nothing about how primer-mcp works with a user who can say no to tickets.
+- No one was there to answer questions. primer-mcp's guidance asks the agent to propose tickets for the user to approve, edit or decline before coding; the one-line instruction doesn't, unless the line asks for that too. This test couldn't see that difference.
 - Every primer run started with an empty ticket folder. In a real project, epics and a "bug fixes" story would usually exist, which affects both the cost and whether small fixes get tickets.
 
 ## Next experiments
@@ -149,6 +150,7 @@ primer-mcp's extra cost (about 50%) is mostly ticket writing, roughly 2–3 tool
   - Measure whether it respects the decision, how long it spends working out context, and whether it gets the result right.
   - Compare primer-mcp with the saved-plan instruction plus git commits, so plan files and git history are the record to beat.
 - **An established project.** Start primer-mcp with existing epics and a "bug fixes" story, to measure the ongoing cost and whether small fixes get tracked.
+- **With a user.** A simulated user who knows requirements the request leaves out. Compare primer-mcp with the one line, both as is and with "wait for my OK" added. Measure whether planning surfaces those requirements before coding, and how much of the user's time it takes.
 - **Another model.** A small run with a more capable model on features and ambiguous requests, where primer-mcp is meant to be strongest. With this model the one line matched primer-mcp there. The check is whether that still holds, since how closely an agent follows a one-line instruction depends on the model.
 
 ## Engineering notes
