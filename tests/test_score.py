@@ -19,7 +19,7 @@ def make_run(tmp_path, calls, arm="baseline", result_text="Done.", patch=False, 
     """A saved run: fixture repo (optionally with the reference fix), transcript and meta."""
     run_dir = tmp_path / "pilot" / SCENARIO / arm / "r1"
     repo = run_dir / "repo"
-    run_eval.prepare_repo(repo, "baseline", "0.1.7")
+    run_eval.prepare_repo(repo, "instructions" if arm == "instructions" else "baseline", "0.1.7")
     if patch:
         ref = run_eval.SCENARIOS / SCENARIO / "reference.patch"
         subprocess.run(["git", "apply", str(ref)], cwd=repo, check=True)
@@ -140,9 +140,17 @@ def test_end_to_end_on_stub_runs(tmp_path):
     )
     assert score.main(["--batch", "pilot", "--runs-dir", str(runs), "--out", str(tmp_path)]) == 0
     csv_text = (tmp_path / "pilot" / "runs.csv").read_text()
-    assert csv_text.count("\n") == 3  # header + one run per arm
+    assert csv_text.count("\n") == 1 + len(run_eval.ARMS)  # header + one run per arm
     summary = (tmp_path / "pilot" / "summary.md").read_text()
     assert "## Rates by arm" in summary and "primer-mcp adoption" in summary
+    assert "| Metric | baseline | instructions | primer |" in summary
+    for arm in ("instructions", "primer"):
+        assert f"## Per-scenario difference ({arm} − baseline)" in summary
+
+
+def test_instructions_claude_md_is_not_a_durable_record(tmp_path):
+    row = score.score_run(make_run(tmp_path, [], arm="instructions"))
+    assert row["durable_record"] is False and row["out_of_scope"] == 0
 
 
 def test_plan_agent_counts_as_planning(tmp_path):

@@ -229,14 +229,17 @@ def summary(rows: list[dict], batch: str) -> str:
     lines += ["", "Rates exclude runs where the metric doesn't apply. Intervals are 95%,",
               "bootstrapped over scenarios.", ""]  # fmt: skip
 
-    if len(arms) == 2:
-        lines += ["## Per-scenario difference (" + f"{arms[1]} − {arms[0]})", ""]
+    others = [a for a in arms if a != "baseline"] if "baseline" in arms else []
+    for arm in others:
+        lines += [f"## Per-scenario difference ({arm} − baseline)", ""]
         head = ["planned_first", "durable_record", "verified", "functional"]
         lines += ["| Scenario | " + " | ".join(head) + " |", "|---|" + "---|" * len(head)]
         for s in sorted({r["scenario"] for r in rows}):
             cells = []
             for m in head:
-                a, b = (rate([r for r in by_arm[x] if r["scenario"] == s], m) for x in arms)
+                a, b = (
+                    rate([r for r in by_arm[x] if r["scenario"] == s], m) for x in ("baseline", arm)
+                )
                 cells.append("–" if a is None or b is None else f"{b - a:+.0%}")
             lines.append(f"| {s} | " + " | ".join(cells) + " |")
         lines.append("")
