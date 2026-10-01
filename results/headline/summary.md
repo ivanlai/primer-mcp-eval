@@ -6,16 +6,16 @@
 
 | Metric | baseline | instructions | primer |
 |---|---|---|---|
-| planned_first | 0% (0%–0%) | 0% (0%–0%) | 53% (25%–78%) |
-| durable_record | 0% (0%–0%) | 0% (0%–0%) | 53% (25%–78%) |
-| verified | 100% (100%–100%) | 97% (91%–100%) | 100% (100%–100%) |
-| functional | 89% (75%–100%) | 86% (72%–97%) | 97% (92%–100%) |
+| planned_first | 0% (0%–0%) | 100% (100%–100%) | 53% (25%–78%) |
+| durable_record | 0% (0%–0%) | 100% (100%–100%) | 53% (25%–78%) |
+| verified | 100% (100%–100%) | 100% (100%–100%) | 100% (100%–100%) |
+| functional | 89% (75%–100%) | 92% (75%–100%) | 97% (92%–100%) |
 | repo_tests | 100% (100%–100%) | 100% (100%–100%) | 100% (100%–100%) |
-| asked | 0% (0%–0%) | 6% (0%–14%) | 0% (0%–0%) |
+| asked | 0% (0%–0%) | 0% (0%–0%) | 0% (0%–0%) |
 | out-of-scope files (mean) | 0.00 | 0.00 | 0.00 |
-| cost $ (mean) | 0.29 | 0.28 | 0.44 |
-| turns (mean) | 18.94 | 17.64 | 29.78 |
-| duration s (mean) | 66.12 | 70.34 | 101.09 |
+| cost $ (mean) | 0.29 | 0.31 | 0.44 |
+| turns (mean) | 18.94 | 20.47 | 29.78 |
+| duration s (mean) | 66.12 | 81.19 | 101.09 |
 
 Rates exclude runs where the metric doesn't apply. Intervals are 95%,
 bootstrapped over scenarios.
@@ -24,18 +24,18 @@ bootstrapped over scenarios.
 
 | Scenario | planned_first | durable_record | verified | functional |
 |---|---|---|---|---|
-| ambiguous-summary | +0% | +0% | +0% | +0% |
-| bug-category-filter-case | +0% | +0% | +0% | -33% |
-| bug-float-amounts | +0% | +0% | +0% | +0% |
-| bug-month-ignores-year | +0% | +0% | +0% | +0% |
-| feature-budgets | +0% | +0% | +0% | +0% |
-| feature-csv | +0% | +0% | +0% | +0% |
-| feature-edit-delete | +0% | +0% | +0% | +0% |
-| feature-recurring | +0% | +0% | +0% | +0% |
-| refactor-render-summary | +0% | +0% | -33% | +0% |
-| refactor-serialisation | +0% | +0% | +0% | +0% |
-| trivial-average-label | +0% | +0% | +0% | +0% |
-| trivial-category-counts | +0% | +0% | +0% | +0% |
+| ambiguous-summary | +100% | +100% | +0% | +33% |
+| bug-category-filter-case | +100% | +100% | +0% | +0% |
+| bug-float-amounts | +100% | +100% | +0% | +0% |
+| bug-month-ignores-year | +100% | +100% | +0% | +0% |
+| feature-budgets | +100% | +100% | +0% | -33% |
+| feature-csv | +100% | +100% | +0% | +33% |
+| feature-edit-delete | +100% | +100% | +0% | +0% |
+| feature-recurring | +100% | +100% | +0% | +0% |
+| refactor-render-summary | +100% | +100% | +0% | +0% |
+| refactor-serialisation | +100% | +100% | +0% | +0% |
+| trivial-average-label | +100% | +100% | +0% | +0% |
+| trivial-category-counts | +100% | +100% | +0% | +0% |
 
 ## Per-scenario difference (primer − baseline)
 

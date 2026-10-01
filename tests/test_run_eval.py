@@ -52,10 +52,12 @@ def test_primer_arm_is_initialised_and_baseline_is_not(tmp_path):
     assert "CLAUDE.md" in tracked.stdout.split()
 
 
-def test_instructions_arm_has_only_a_plan_first_claude_md(tmp_path):
+def test_instructions_arm_has_only_the_one_line_claude_md(tmp_path):
     run(tmp_path, "--arm", "instructions")
     d = tmp_path / "pilot" / SCENARIO / "instructions" / "r1"
-    assert (d / "repo" / "CLAUDE.md").read_text() == "Plan first.\n"
+    assert (
+        d / "repo" / "CLAUDE.md"
+    ).read_text() == "Plan first, and save the plan in docs/ before changing code.\n"
     assert not (d / "repo" / "primer").exists() and not (d / "repo" / "AGENTS.md").exists()
     tracked = subprocess.run(["git", "ls-files"], cwd=d / "repo", capture_output=True, text=True)
     assert "CLAUDE.md" in tracked.stdout.split()

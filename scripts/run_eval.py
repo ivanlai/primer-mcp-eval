@@ -4,7 +4,7 @@ Each run gets a fresh git repo of the fixture, a throwaway HOME (so no user-leve
 CLAUDE.md, memory, hooks, git config or MCP servers reach it), pinned versions from
 eval.toml, and --strict-mcp-config. The primer arm has init_project applied before
 the initial commit; the baseline arm has no MCP servers at all; the instructions arm
-(ADR-006) is the baseline plus a CLAUDE.md that says only "Plan first."
+(ADR-007) is the baseline plus a one-line CLAUDE.md asking for a plan saved in docs/
 
 Output, per run: runs/<batch>/<scenario>/<arm>/r<n>/ with prompt.txt, command.json,
 transcript.jsonl, stderr.txt, meta.json and repo/ (the final working copy). A run
@@ -41,7 +41,8 @@ SCENARIOS = ROOT / "scenarios"
 RUNS = ROOT / "runs"
 FIXTURE = "fixtures/app"
 ARMS = ("baseline", "primer", "instructions")
-INSTRUCTIONS = "Plan first.\n"  # the instructions arm's whole CLAUDE.md
+# The instructions arm's whole CLAUDE.md.
+INSTRUCTIONS = "Plan first, and save the plan in docs/ before changing code.\n"
 BATCHES = ("pilot", "headline")
 PROJECT_NAME = "expenses"
 RETRY_WAITS_S = (900, 1800, 3600, 3600)  # per failed run, then give up on the batch
