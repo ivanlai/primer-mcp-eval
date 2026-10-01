@@ -74,6 +74,7 @@ def validate(scenario: Path) -> list[str]:
         return ["no scenario.toml"]
     problems = []
 
+    # 1. Metadata: kind and expected_files.
     meta = tomllib.loads((scenario / "scenario.toml").read_text())
     if meta.get("kind") not in KINDS:
         problems.append(f"kind must be one of {sorted(KINDS)}")
@@ -82,6 +83,7 @@ def validate(scenario: Path) -> list[str]:
         problems.append("expected_files must be a non-empty list")
         expected = []
 
+    # 2. Prompt: present, and free of words that hint at the behaviour being measured.
     prompt_file = scenario / "prompt.md"
     prompt = prompt_file.read_text().strip() if prompt_file.is_file() else ""
     if not prompt:
@@ -89,6 +91,7 @@ def validate(scenario: Path) -> list[str]:
     for word in sorted({m.group(0).lower() for m in BANNED.finditer(prompt)}):
         problems.append(f"prompt mentions {word!r}")
 
+    # 3. Check and reference patch present; the steps below need both.
     checks = list(scenario.glob("test_*.py"))
     patch_file = scenario / "reference.patch"
     if len(checks) != 1 or not patch_file.is_file():
@@ -98,6 +101,7 @@ def validate(scenario: Path) -> list[str]:
             problems.append("reference.patch missing")
         return problems
 
+    # 4. Scope: the reference changes only expected_files (tests/ always allowed).
     patch = patch_file.read_text()
     outside = sorted(
         f
@@ -111,20 +115,26 @@ def validate(scenario: Path) -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
         copy = Path(tmp)
         fresh_fixture(copy)
+
+        # 5. Before the patch: the check must fail (not pass, not error) on the fixture.
         before = pytest(copy, *check)
         if before == "passed":
             problems.append("check passes on the fixture as shipped")
         elif before == "error":
             problems.append("check errors (rather than fails) on the fixture as shipped")
 
+        # 6. Apply the reference patch to the copy.
         applied = subprocess.run(
             ["git", "apply", str(patch_file)], cwd=copy, capture_output=True, text=True
         )
         if applied.returncode != 0:
             return [*problems, f"reference.patch does not apply: {applied.stderr.strip()}"]
+
+        # 7. After the patch: the check passes ...
         after = pytest(copy, *check)
         if after != "passed":
             problems.append(f"check {VERB[after]} with the reference applied")
+        # ... and so does the fixture's own suite.
         suite = pytest(copy)
         if suite != "passed":
             problems.append(f"fixture suite {VERB[suite]} with the reference applied")
