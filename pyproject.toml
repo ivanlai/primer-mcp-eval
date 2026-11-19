@@ -1,0 +1,11 @@
+[project]
+name = "primer-mcp-eval"
+version = "0"
+requires-python = ">=3.11"
+dependencies = []  # standard library only; export_inspect.py and the tests use the dev group
+
+[dependency-groups]
+dev = ["pytest", "inspect_ai==0.3.285"]
+
+[tool.uv]
+package = false

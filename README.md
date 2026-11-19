@@ -66,20 +66,33 @@ Every request:
 
 **Scoring** (`scripts/score.py`). Worked out from each run's transcript and final files:
 
-| Measure | Counts when |
-|---|---|
-| Wrote a plan first | a planning tool, a ticket or a Markdown file came before the first code change |
-| Left a record | a Markdown file was added or changed in the repo |
-| Verified | tests were run after the last code change |
-| Stayed in scope | no files changed outside the ones the request needs |
-| Worked | the request's check passes |
-| Cost | turns, time and estimated cost |
+| Measure | Viewer column | Counts when |
+|---|---|---|
+| Wrote a plan first | `planned_first` | a planning tool, a ticket or a Markdown file came before the first code change |
+| Left a record | `durable_record` | a Markdown file was added or changed in the repo |
+| Verified | `verified` | tests were run after the last code change |
+| Stayed in scope | `out_of_scope` (metadata) | no files changed outside the ones the request needs |
+| Worked | `functional` | the request's check passes |
+| App's own tests still pass | `repo_tests` | the app's test suite, as the agent left it, passes |
+| Asked instead of coding | `asked` | the run made no code change and ended with a question |
+| Cost | metadata | turns, time and estimated cost |
 
 A 24-run pilot first tested the pipeline and the scoring rules ([`results/pilot/summary.md`](results/pilot/summary.md)).
 
 ## Results
 
 108 runs at Claude Code 2.1.283, `claude-sonnet-5`, primer-mcp 0.1.7. All passed the isolation check. Full tables: [`results/headline/summary.md`](results/headline/summary.md); one row per run: [`results/headline/runs.csv`](results/headline/runs.csv).
+
+**Browsing the runs.** Every run's transcript and scores are in [`results/headline/inspect/`](results/headline/inspect/), in the log format of [Inspect](https://inspect.aisi.org.uk/), one file per setup. To open them, run `uv sync` once, then:
+
+```
+uv run inspect view --log-dir results/headline/inspect
+```
+
+- Each measure in the Scoring table is a column. C means yes, I means no, and an empty cell means the measure doesn't apply to that run.
+- Green and red are Inspect's colours, not a verdict. "No" is the expected answer for `asked`, and for `planned_first` on primer-mcp's bug fixes.
+- The duration at the top of each log is elapsed time, from the first run's start to the last run's end. It includes waits for usage limits and, for baseline and primer, each other's runs, because those two ran interleaved. Each run's own DURATION column is its working time.
+- This repo's own runner made the runs. The logs use only Inspect's format and viewer.
 
 | | Baseline | Instructions | primer-mcp |
 |---|---|---|---|
@@ -181,5 +194,6 @@ python3 scripts/run_eval.py --batch pilot --dry-run                     # show w
 python3 scripts/run_eval.py --batch headline --reps 3 --wait-on-limit   # real runs (see scripts/README.md for login)
 python3 scripts/run_eval.py --batch headline --reps 3 --redo-failed     # rerun failed runs
 python3 scripts/score.py --batch headline                               # write results/headline/summary.md
-uv run --with pytest --no-project pytest tests                          # test the scripts offline
+uv run python scripts/export_inspect.py --batch headline                # write results/headline/inspect/
+uv run pytest tests                                                     # test the scripts offline
 ```
